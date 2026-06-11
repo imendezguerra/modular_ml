@@ -25,3 +25,9 @@ data/*/
 
 # Docs build
 site/
+
+# Accidental self-clone created by the Colab tutorial bootstrap when run with a
+# local CWD inside the repo (in Colab it lands in /content and is ephemeral).
+# Anchored so it never matches the real package at src/modular_ml/.
+/modular_ml/
+/notebooks/modular_ml/
