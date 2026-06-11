@@ -1,0 +1,13 @@
+# wandb grid sweep over the sequential run config.
+# Parameter keys are dotted paths into the composed config; they are merged in
+# before resolution so interpolations (e.g. the recurrent gain g) pick them up.
+program: scripts/run_sweep.py
+method: grid
+metric:
+  name: sweep/objective
+  goal: maximize
+parameters:
+  optim.lr:
+    values: [0.0005, 0.001, 0.002]
+  model.architecture.global_params.g:
+    values: [1.0, 1.3]

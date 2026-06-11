@@ -1,0 +1,24 @@
+# Classification objective: cross-entropy + a tiny L2 penalty on the readout
+# weights (a `requires_model` term that reads parameters directly).
+_target_: modular_ml.configs.optim_configs.OptimizerConfig
+optim: Adam
+lr: 1.0e-2
+clip_grad: 0.0
+
+losses:
+  ce:
+    _target_: modular_ml.configs.optim_configs.LossSpec
+    _loss_target_: modular_ml.losses.loss.LossModule
+    id: ce
+    criterion: cross_entropy
+    in_keys: [readout.logits]
+    label_key: ${dataset.label_key}
+    reg_weight: 1.0
+  weights:
+    _target_: modular_ml.configs.optim_configs.LossSpec
+    _loss_target_: modular_ml.losses.loss.LossModule
+    id: weights
+    criterion: norm2
+    in_keys: [readout]
+    requires_model: true
+    reg_weight: 1.0e-4

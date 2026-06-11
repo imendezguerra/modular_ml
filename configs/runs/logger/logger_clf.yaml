@@ -1,0 +1,12 @@
+# Logger for the classification task. The sweep objective maximises test accuracy.
+_target_: modular_ml.configs.log_configs.LoggerConfig
+wandb_groups: [train, test, pca]
+activation_keys: [encoder.repr]
+objective:
+  _target_: modular_ml.configs.log_configs.ObjectiveConfig
+  combination: weighted_mean
+  metrics:
+    - _target_: modular_ml.configs.log_configs.MetricSpec
+      name: test/accuracy
+      weight: 1.0
+      epoch_reduction: last

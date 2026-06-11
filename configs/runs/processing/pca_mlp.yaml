@@ -1,0 +1,6 @@
+# Post-test analysis: PCA over the learned encoder representation.
+_target_: modular_ml.configs.processing_configs.ProcessingConfig
+run_pca: true
+pca_keys: [encoder.repr]
+pca_dims: 10
+evr_threshold: 0.95

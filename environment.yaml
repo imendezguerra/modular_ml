@@ -1,0 +1,21 @@
+name: modular_ml
+channels:
+  - pytorch
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pytorch>=2.2
+  - numpy>=1.26
+  - scipy>=1.11
+  - scikit-learn>=1.3
+  - pandas>=2.1
+  - h5py>=3.10
+  - matplotlib>=3.8
+  - tqdm>=4.66
+  - pyyaml>=6.0
+  - pip:
+      # Installs the package plus its runtime, dev (pytest, ruff) and docs
+      # (mkdocs) dependencies from pyproject.toml. Heavy scientific packages
+      # above are provided by conda and simply satisfied here.
+      - -e ".[dev,docs]"

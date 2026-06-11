@@ -1,0 +1,58 @@
+# Recurrent model for the sequential task: leaky RNN -> linear readout.
+# Dimensions interpolate from the dataset group; alpha = dt/tau via the
+# `divide` resolver. The recurrent matrix starts frozen and is unfrozen at a
+# milestone by the runtime schedule (a simple curriculum).
+_target_: modular_ml.configs.model_configs.ModelConfig
+name: rnn_sine
+n_inputs: ${dataset.in_dim}
+n_outputs: ${dataset.out_dim}
+in_key: ${dataset.in_key}
+out_key: prediction
+tau_s: 0.05
+dt_s: ${dataset.dt}
+alpha: ${divide:${model.dt_s},${model.tau_s}}
+batch_size: 32
+epochs: 200
+
+architecture:
+  _target_: modular_ml.configs.model_configs.ArchitectureConfig
+  global_params:
+    hidden: 64
+    nonlin: tanh
+    g: 1.3
+  modules:
+    rnn:
+      _target_: modular_ml.configs.model_configs.BlockSpec
+      _block_target_: modular_ml.models.blocks.RNNBlock
+      id: rnn
+      in_keys: ["${model.in_key}"]
+      out_keys: [activity]
+      in_dim: ${model.n_inputs}
+      out_dim: ${model.architecture.global_params.hidden}
+      params:
+        alpha: ${model.alpha}
+        activation: ${model.architecture.global_params.nonlin}
+        bias_in: false
+        bias_rec: false
+      init:
+        linear_hh.weight:
+          _target_: modular_ml.configs.init_configs.InitNormalRec
+          g: ${model.architecture.global_params.g}
+      freeze: [linear_hh.weight]
+    readout:
+      _target_: modular_ml.configs.model_configs.BlockSpec
+      _block_target_: modular_ml.models.blocks.LinearBlock
+      id: readout
+      in_keys: [rnn.activity]
+      out_keys: [prediction]
+      in_dim: ${model.architecture.global_params.hidden}
+      out_dim: ${model.n_outputs}
+      params:
+        activation: none
+  schedule:
+    _target_: modular_ml.configs.model_configs.RuntimeScheduleConfig
+    milestones: [100]
+    states:
+      - modules:
+          rnn:
+            unfreeze: [linear_hh.weight]

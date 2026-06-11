@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+.ipynb_checkpoints/
+.pytest_cache/
+.ruff_cache/
+
+# Project artifacts
+outputs/
+wandb/
+data/*/
+*.h5
+*.pt
+*.parquet
+
+# OS / editors
+.DS_Store
+.vscode/
+.idea/
+
+# Docs build
+site/

@@ -1,0 +1,11 @@
+# wandb grid sweep over the tabular run config.
+program: scripts/run_sweep.py
+method: grid
+metric:
+  name: sweep/objective
+  goal: maximize
+parameters:
+  optim.lr:
+    values: [0.005, 0.01, 0.02]
+  model.architecture.global_params.embed:
+    values: [16, 32]

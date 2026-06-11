@@ -1,0 +1,11 @@
+# Tabular dataset: nonlinear multi-class classification (ring of gaussian blobs).
+_target_: modular_ml.configs.dataset_configs.DatasetConfig
+name: blobs
+data_dir: blobs
+task_type: classification
+in_dim: 2
+out_dim: 4
+dt: 0.0
+in_key: features
+out_key: logits
+label_key: label

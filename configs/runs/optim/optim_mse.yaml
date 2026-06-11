@@ -1,0 +1,29 @@
+# Regression objective: supervised MSE + a scheduled temporal-smoothness
+# regulariser on the RNN activity (weight ramps 0 -> 1 over the first 100 epochs).
+_target_: modular_ml.configs.optim_configs.OptimizerConfig
+optim: Adam
+lr: 1.0e-3
+clip_grad: 1.0
+
+losses:
+  mse:
+    _target_: modular_ml.configs.optim_configs.LossSpec
+    _loss_target_: modular_ml.losses.loss.LossModule
+    id: mse
+    criterion: mse
+    in_keys: [readout.prediction]
+    label_key: ${dataset.label_key}
+    reg_weight: 1.0
+  smooth:
+    _target_: modular_ml.configs.optim_configs.LossSpec
+    _loss_target_: modular_ml.losses.loss.LossModule
+    id: smooth
+    criterion: temporal_smoothness
+    in_keys: [rnn.activity]
+    reg_weight: 0.01
+    schedule:
+      type: linear_ramp
+      start_epoch: 0
+      end_epoch: 100
+      start_value: 0.0
+      end_value: 1.0

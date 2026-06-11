@@ -1,0 +1,30 @@
+site_name: modular_ml
+site_description: A Hydra + dataclasses template for modular, wandb-tracked ML.
+docs_dir: docs
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+  features:
+    - navigation.sections
+    - content.code.copy
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - toc:
+      permalink: true
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - Repository structure: repo-structure.md
+  - Configuration: configs.md
+  - Models and losses: models-and-losses.md
+  - Data: data.md
+  - Pipeline usage: pipeline-usage.md
+  - Sweeps: sweeps.md
+  - Experiments: experiment-usage.md
+  - Tracking & reproducibility: tracking-and-reproducibility.md
+  - Tutorial: tutorial.md
+  - Troubleshooting: troubleshooting.md

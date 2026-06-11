@@ -1,0 +1,61 @@
+_target_: modular_ml.configs.main_configs.Config
+seed: 0
+dataset:
+  _target_: modular_ml.configs.dataset_configs.DatasetConfig
+  name: sine
+  data_dir: /Users/irene/Documents/work_local/modular_ml_pipe/data/sine
+  task_type: regression
+  in_dim: 2
+  out_dim: 1
+  in_key: stim
+  out_key: target
+  label_key: target
+model:
+  _target_: modular_ml.configs.model_configs.ModelConfig
+  n_inputs: 2
+  n_outputs: 1
+  in_key: stim
+  alpha: 0.2
+  epochs: 20
+  batch_size: 32
+  architecture:
+    _target_: modular_ml.configs.model_configs.ArchitectureConfig
+    modules:
+      rnn:
+        _target_: modular_ml.configs.model_configs.BlockSpec
+        _block_target_: modular_ml.models.blocks.RNNBlock
+        id: rnn
+        in_keys:
+        - stim
+        out_keys:
+        - activity
+        in_dim: 2
+        out_dim: 32
+        params:
+          alpha: 0.2
+          activation: tanh
+      readout:
+        _target_: modular_ml.configs.model_configs.BlockSpec
+        _block_target_: modular_ml.models.blocks.LinearBlock
+        id: readout
+        in_keys:
+        - rnn.activity
+        out_keys:
+        - prediction
+        in_dim: 32
+        out_dim: 1
+optim:
+  _target_: modular_ml.configs.optim_configs.OptimizerConfig
+  losses:
+    mse:
+      _target_: modular_ml.configs.optim_configs.LossSpec
+      id: mse
+      criterion: mse
+      in_keys:
+      - readout.prediction
+      label_key: target
+logger:
+  _target_: modular_ml.configs.log_configs.LoggerConfig
+processing:
+  _target_: modular_ml.configs.processing_configs.ProcessingConfig
+  run_pca: false

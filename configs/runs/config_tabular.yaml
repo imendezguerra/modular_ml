@@ -1,0 +1,11 @@
+# Concrete run: tabular classification task. Same pipeline, different blocks.
+_target_: modular_ml.configs.main_configs.Config
+defaults:
+  - dataset: tabular_blobs
+  - model: model_mlp
+  - optim: optim_ce
+  - logger: logger_clf
+  - processing: pca_mlp
+  - _self_
+
+seed: 0

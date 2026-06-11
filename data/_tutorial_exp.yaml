@@ -1,0 +1,13 @@
+_target_: modular_ml.configs.experiment_configs.ExperimentConfig
+runs:
+  pretrain:
+    _target_: modular_ml.configs.experiment_configs.RunSpec
+    id: pretrain
+    config_path: /Users/irene/Documents/work_local/modular_ml_pipe/data/_tutorial_run.yaml
+    run_mode: train_test
+  finetune:
+    _target_: modular_ml.configs.experiment_configs.RunSpec
+    id: finetune
+    config_path: /Users/irene/Documents/work_local/modular_ml_pipe/data/_tutorial_run.yaml
+    load_params_from: pretrain
+    run_mode: train_test

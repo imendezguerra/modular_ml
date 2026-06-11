@@ -1,0 +1,13 @@
+# Concrete run: sequential sine-generation task.
+# Composes the dataset / model / optim / logger / processing groups. Override any
+# leaf from here or the command line (Hydra style).
+_target_: modular_ml.configs.main_configs.Config
+defaults:
+  - dataset: seq_sine
+  - model: model_rnn
+  - optim: optim_mse
+  - logger: logger_reg
+  - processing: pca_rnn
+  - _self_
+
+seed: 0

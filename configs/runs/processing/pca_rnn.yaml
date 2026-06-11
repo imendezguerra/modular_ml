@@ -1,0 +1,6 @@
+# Post-test analysis: PCA over the RNN hidden activity.
+_target_: modular_ml.configs.processing_configs.ProcessingConfig
+run_pca: true
+pca_keys: [rnn.activity]
+pca_dims: 10
+evr_threshold: 0.95

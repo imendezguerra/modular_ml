@@ -1,0 +1,39 @@
+# Feed-forward model for the tabular task: MLP encoder -> linear classifier.
+_target_: modular_ml.configs.model_configs.ModelConfig
+name: mlp_blobs
+n_inputs: ${dataset.in_dim}
+n_outputs: ${dataset.out_dim}
+in_key: ${dataset.in_key}
+out_key: logits
+batch_size: 64
+epochs: 60
+
+architecture:
+  _target_: modular_ml.configs.model_configs.ArchitectureConfig
+  global_params:
+    embed: 32
+    hidden: 64
+    nonlin: relu
+  modules:
+    encoder:
+      _target_: modular_ml.configs.model_configs.BlockSpec
+      _block_target_: modular_ml.models.blocks.FixedEncoderBlock
+      id: encoder
+      in_keys: ["${model.in_key}"]
+      out_keys: [repr]
+      in_dim: ${model.n_inputs}
+      out_dim: ${model.architecture.global_params.embed}
+      params:
+        hidden_dims: ["${model.architecture.global_params.hidden}"]
+        activation: ${model.architecture.global_params.nonlin}
+        trainable: true
+    readout:
+      _target_: modular_ml.configs.model_configs.BlockSpec
+      _block_target_: modular_ml.models.blocks.LinearBlock
+      id: readout
+      in_keys: [encoder.repr]
+      out_keys: [logits]
+      in_dim: ${model.architecture.global_params.embed}
+      out_dim: ${model.n_outputs}
+      params:
+        activation: none

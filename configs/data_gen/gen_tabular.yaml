@@ -1,0 +1,9 @@
+# Parameters for generating the tabular blobs dataset.
+generator: blobs
+out_dir: blobs
+n_samples: 2000
+n_classes: 4
+n_features: 2
+cluster_std: 0.6
+test_frac: 0.2
+seed: 0

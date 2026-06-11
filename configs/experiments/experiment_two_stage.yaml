@@ -1,0 +1,18 @@
+# Two-stage experiment: pretrain the RNN, then finetune from its checkpoint.
+# `load_params_from` initialises stage 2's weights from stage 1's saved
+# `model_trained.pt`. A provenance manifest is written after both stages.
+_target_: modular_ml.configs.experiment_configs.ExperimentConfig
+runs:
+  pretrain:
+    _target_: modular_ml.configs.experiment_configs.RunSpec
+    id: pretrain
+    config_path: config_sequential.yaml
+    run_mode: train_test
+    notes: stage 1 - pretrain the sine model from scratch
+  finetune:
+    _target_: modular_ml.configs.experiment_configs.RunSpec
+    id: finetune
+    config_path: config_sequential.yaml
+    load_params_from: pretrain
+    run_mode: train_test
+    notes: stage 2 - finetune starting from the pretrained checkpoint
