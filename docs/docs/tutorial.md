@@ -5,11 +5,11 @@ and a two-stage experiment — and shows how to extend the template with a new
 block and a new loss term. It uses only the configs that ship with the repo.
 
 !!! tip "Prefer to run it interactively?"
-    A runnable [**Google Colab notebook**](https://github.com/USER/modular_ml_pipe/blob/main/notebooks/tutorial_colab.ipynb)
+    A runnable [**Google Colab notebook**](https://colab.research.google.com/github/imendezguerra/modular_ml/blob/main/notebooks/tutorial_colab.ipynb)
     (`notebooks/tutorial_colab.ipynb`) mirrors this page and executes end to end —
     including inline plots of the predictions, loss curve and PCA. It defaults to
     `WANDB_MODE=disabled` so it runs without a wandb account; flip one switch to
-    log to a real project. Update the `USER` part of the link to your fork.
+    log to a real project. Update the link/`REPO_URL` to your fork if you renamed the repo.
 
 ## 0. Setup
 
