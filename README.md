@@ -1,5 +1,7 @@
 # modular_ml
 
+[![CI](https://github.com/imendezguerra/modular_ml/actions/workflows/ci.yml/badge.svg)](https://github.com/imendezguerra/modular_ml/actions/workflows/ci.yml)
+
 A small, opinionated **template** for building modular AI models that are fully
 tractable in [Weights & Biases](https://wandb.ai). It shows how
 [Hydra](https://hydra.cc) structured configs (backed by Python dataclasses) can
@@ -52,6 +54,14 @@ Run the tests (no wandb account needed — wandb runs in disabled mode):
 
 ```bash
 pytest
+```
+
+For development, install the git hooks once (pre-commit ships with the `dev` extras).
+They lint and format on every commit and run the tests on every push:
+
+```bash
+pre-commit install
+pre-commit run --all-files   # optional: run every hook on the whole repo now
 ```
 
 ## Documentation
