@@ -67,9 +67,16 @@ def generate_sine(
     h5_save({"stim": stim[:, train_idx], "target": target[:, train_idx]}, out_dir / "train.h5")
     h5_save({"stim": stim[:, test_idx], "target": target[:, test_idx]}, out_dir / "test.h5")
     meta = {
-        "name": out_dir.name, "task_type": "regression", "layout": "TBF",
-        "in_dim": 2, "out_dim": 1, "dt": dt, "seq_len": seq_len,
-        "in_key": "stim", "out_key": "target", "label_key": "target",
+        "name": out_dir.name,
+        "task_type": "regression",
+        "layout": "TBF",
+        "in_dim": 2,
+        "out_dim": 1,
+        "dt": dt,
+        "seq_len": seq_len,
+        "in_key": "stim",
+        "out_key": "target",
+        "label_key": "target",
     }
     yaml_save(meta, out_dir / "meta.yaml")
     return meta
@@ -110,9 +117,15 @@ def generate_blobs(
     h5_save({"features": x[train_idx], "label": y[train_idx]}, out_dir / "train.h5")
     h5_save({"features": x[test_idx], "label": y[test_idx]}, out_dir / "test.h5")
     meta = {
-        "name": out_dir.name, "task_type": "classification", "layout": "BF",
-        "in_dim": n_features, "out_dim": n_classes, "dt": 0.0,
-        "in_key": "features", "out_key": "logits", "label_key": "label",
+        "name": out_dir.name,
+        "task_type": "classification",
+        "layout": "BF",
+        "in_dim": n_features,
+        "out_dim": n_classes,
+        "dt": 0.0,
+        "in_key": "features",
+        "out_key": "logits",
+        "label_key": "label",
     }
     yaml_save(meta, out_dir / "meta.yaml")
     return meta

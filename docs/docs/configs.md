@@ -34,8 +34,9 @@ turn the composed YAML back into typed Python objects.
 
 ```python
 from modular_ml.configs.main_configs import load_config
+
 cfg = load_config("configs/runs/config_sequential.yaml")
-cfg.model.n_inputs   # -> 2  (typed, resolved)
+cfg.model.n_inputs  # -> 2  (typed, resolved)
 ```
 
 Pass `instantiate=False` to keep a raw `DictConfig` (used when merging sweep
@@ -87,7 +88,7 @@ Because it's Hydra, any leaf can be overridden when you compose. In code:
 
 ```python
 cfg = load_config("configs/runs/config_sequential.yaml")
-cfg.model.epochs = 50      # plain attribute access after instantiation
+cfg.model.epochs = 50  # plain attribute access after instantiation
 ```
 
 For sweeps, overrides are merged *before* instantiation — see

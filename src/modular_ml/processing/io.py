@@ -32,8 +32,9 @@ def load_outputs_from_run(run_name: str) -> Dict:
     return h5_load(_local_or_download(run_name, "test_outputs.h5", "outputs", "outputs"))
 
 
-def load_model_params_from_run(run_name: str, filename: str = "model_trained.pt",
-                               device: str = "cpu") -> Dict:
+def load_model_params_from_run(
+    run_name: str, filename: str = "model_trained.pt", device: str = "cpu"
+) -> Dict:
     """Load a saved checkpoint dict for a run."""
     path = _local_or_download(run_name, filename, "model", "model")
     return torch.load(path, map_location=device, weights_only=False)

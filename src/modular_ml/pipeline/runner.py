@@ -108,8 +108,9 @@ class Runner:
         return ds
 
     # --- metrics -------------------------------------------------------------
-    def _supervised_metric(self, data: Dict[str, torch.Tensor],
-                           labels: Dict[str, torch.Tensor]) -> Dict[str, float]:
+    def _supervised_metric(
+        self, data: Dict[str, torch.Tensor], labels: Dict[str, torch.Tensor]
+    ) -> Dict[str, float]:
         pred = data.get(self.pred_key)
         target = labels.get(self.label_key)
         if pred is None or target is None:
@@ -165,8 +166,12 @@ class Runner:
             if epoch % PRINT_EPOCH == 0:
                 metrics = {"train/total_loss": self.train_loss, "train/epoch": float(epoch)}
                 metrics.update(_flatten_terms("train", terms))
-                metrics.update({f"train/{k}": _mean_metric(epoch_metrics, k)
-                                for k in (epoch_metrics[0] if epoch_metrics else {})})
+                metrics.update(
+                    {
+                        f"train/{k}": _mean_metric(epoch_metrics, k)
+                        for k in (epoch_metrics[0] if epoch_metrics else {})
+                    }
+                )
                 self._log(epoch, metrics)
         self._last_epoch = self.cfg.model.epochs
 
@@ -192,8 +197,9 @@ class Runner:
         with torch.no_grad():
             data, labels = ds.full()
             out = self.model(data)
-            total, terms = self.loss(out, labels, model=self.model,
-                                     epoch=self._last_epoch, mode="test")
+            total, terms = self.loss(
+                out, labels, model=self.model, epoch=self._last_epoch, mode="test"
+            )
 
         metrics = {"test/total_loss": total.item()}
         metrics.update(_flatten_terms("test", terms))
@@ -205,8 +211,7 @@ class Runner:
         self._save_model(self._last_epoch, "model_trained.pt")
         return metrics
 
-    def _save_outputs(self, out: Dict[str, torch.Tensor],
-                      labels: Dict[str, torch.Tensor]) -> None:
+    def _save_outputs(self, out: Dict[str, torch.Tensor], labels: Dict[str, torch.Tensor]) -> None:
         payload = {k: _to_numpy(v) for k, v in out.items() if torch.is_tensor(v)}
         for k, v in labels.items():
             payload[f"label.{k}"] = _to_numpy(v)
@@ -258,8 +263,12 @@ class Runner:
         obj_cfg = self.cfg.logger.objective
         if obj_cfg is None or not obj_cfg.metrics:
             return None
-        reducers = {"last": lambda v: v[-1], "max": max, "min": min,
-                    "mean": lambda v: float(np.mean(v))}
+        reducers = {
+            "last": lambda v: v[-1],
+            "max": max,
+            "min": min,
+            "mean": lambda v: float(np.mean(v)),
+        }
         values, weights = [], []
         for spec in obj_cfg.metrics:
             hist = self._metric_history.get(spec.name, [])

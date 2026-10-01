@@ -53,14 +53,18 @@ This creates the sweep and runs the agent. Internally:
 ```python
 sweep_id = wandb.sweep(sweep_cfg, project=PROJECT)
 
+
 def _sweep_run():
     wandb.init(project=PROJECT)
     overrides = OmegaConf.from_dotlist([f"{k}={v}" for k, v in wandb.config.items()])
-    merged = OmegaConf.merge(base_cfg, overrides)   # base loaded instantiate=False
+    merged = OmegaConf.merge(base_cfg, overrides)  # base loaded instantiate=False
     OmegaConf.resolve(merged)
     config = hydra.utils.instantiate(merged, _convert_="all")
     runner = Runner(config, use_wandb=True, is_sweep=True)
-    runner.run_train(); runner.run_test(); runner.compute_objective()
+    runner.run_train()
+    runner.run_test()
+    runner.compute_objective()
+
 
 wandb.agent(sweep_id, function=_sweep_run, count=count)
 ```

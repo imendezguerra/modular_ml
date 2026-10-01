@@ -34,7 +34,7 @@ def _apply_init(tensor: torch.Tensor, method: Optional[str], spec: Any) -> None:
     elif method == "normal_rec":
         g = _attr(spec, "g", 1.2)
         n = tensor.shape[0]
-        nn.init.normal_(tensor, 0.0, g / (n ** 0.5))
+        nn.init.normal_(tensor, 0.0, g / (n**0.5))
     elif method == "fill":
         tensor.fill_(_attr(spec, "value", 0.0))
     else:
@@ -69,9 +69,9 @@ def _init_param(tensor: torch.Tensor, spec: Optional[InitSpecs]) -> None:
             if in_dim is None or in_spec is None:
                 raise ValueError("InitByInputs requires dim and spec per chunk.")
             if tensor.ndim == 2:
-                sub = tensor[:, offset:offset + in_dim]
+                sub = tensor[:, offset : offset + in_dim]
             else:
-                sub = tensor[offset:offset + in_dim]
+                sub = tensor[offset : offset + in_dim]
             _apply_init(sub, _attr(in_spec, "method", None), in_spec)
             offset += in_dim
     else:

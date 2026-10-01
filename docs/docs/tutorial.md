@@ -57,8 +57,9 @@ point of the template: **the engineering is shared; the configs vary.**
 
 ```python
 from modular_ml.processing.io import load_outputs_from_run
+
 out = load_outputs_from_run("<your-run-name>")
-print(out.keys())          # rnn.activity, readout.prediction, label.target, ...
+print(out.keys())  # rnn.activity, readout.prediction, label.target, ...
 print(out["rnn.activity"].shape)
 ```
 

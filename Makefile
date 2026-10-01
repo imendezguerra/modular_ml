@@ -22,7 +22,7 @@ experiment:
 	python scripts/run_experiment.py
 
 docs:
-	mkdocs build
+	mkdocs build --strict -f docs/mkdocs.yml
 
 clean:
 	rm -rf outputs wandb site **/__pycache__ .pytest_cache

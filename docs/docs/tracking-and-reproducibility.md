@@ -26,12 +26,14 @@ settings — including swept overrides — that produced a run:
 
 ```python
 from modular_ml.processing.io import (
-    load_config_from_run, load_outputs_from_run, load_model_params_from_run,
+    load_config_from_run,
+    load_outputs_from_run,
+    load_model_params_from_run,
 )
 
-cfg     = load_config_from_run("lively-sun-12")     # sim_config.yaml
-outputs = load_outputs_from_run("lively-sun-12")    # test_outputs.h5
-ckpt    = load_model_params_from_run("lively-sun-12")  # model_trained.pt
+cfg = load_config_from_run("lively-sun-12")  # sim_config.yaml
+outputs = load_outputs_from_run("lively-sun-12")  # test_outputs.h5
+ckpt = load_model_params_from_run("lively-sun-12")  # model_trained.pt
 ```
 
 These helpers look in the local `outputs/<run>/` first, then fall back to

@@ -88,9 +88,7 @@ class InitByInputs(InitBase):
     _target_: str = "modular_ml.configs.init_configs.InitByInputs"
 
     def __post_init__(self):
-        self.chunks = [
-            c if isinstance(c, InitChunk) else InitChunk(**c) for c in self.chunks
-        ]
+        self.chunks = [c if isinstance(c, InitChunk) else InitChunk(**c) for c in self.chunks]
 
 
 InitSpecs = Union[InitNormal, InitUniform, InitNormalRec, InitFill, InitByInputs]

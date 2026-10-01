@@ -25,7 +25,7 @@ def test_load_split_sequential_batching(sine_dir):
     cfg = DatasetConfig(name="sine", data_dir=str(sine_dir))
     ds = load_split(cfg, "train")
     data, labels = next(ds.iter_batches(8, shuffle=False))
-    assert data["stim"].shape[1] == 8          # batch on axis 1
+    assert data["stim"].shape[1] == 8  # batch on axis 1
     assert labels["target"].shape[1] == 8
 
 
@@ -33,5 +33,5 @@ def test_load_split_tabular_batching(blobs_dir):
     cfg = DatasetConfig(name="blobs", data_dir=str(blobs_dir))
     ds = load_split(cfg, "train")
     data, labels = next(ds.iter_batches(8, shuffle=False))
-    assert data["features"].shape[0] == 8      # batch on axis 0
+    assert data["features"].shape[0] == 8  # batch on axis 0
     assert labels["label"].dtype == torch.long

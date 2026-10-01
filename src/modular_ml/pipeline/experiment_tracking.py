@@ -59,9 +59,7 @@ def build_manifest(
     }
 
 
-def write_manifest_files(
-    manifest: Dict[str, Any], output_dir: Path
-) -> Dict[str, Path]:
+def write_manifest_files(manifest: Dict[str, Any], output_dir: Path) -> Dict[str, Path]:
     """Write the manifest and a run-name map; return their paths."""
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)

@@ -21,8 +21,7 @@ from modular_ml.tools.loaders import h5_load, yaml_load
 class TensorDataset:
     """In-memory tensors for one split, with layout-aware batching."""
 
-    def __init__(self, tensors: Dict[str, torch.Tensor], meta: Dict, in_key: str,
-                 label_key: str):
+    def __init__(self, tensors: Dict[str, torch.Tensor], meta: Dict, in_key: str, label_key: str):
         self.tensors = tensors
         self.meta = meta
         self.layout = meta.get("layout", "BF")
@@ -40,7 +39,7 @@ class TensorDataset:
         """Yield ``(data_dict, label_dict)`` minibatches over the batch axis."""
         order = torch.randperm(self.n, generator=generator) if shuffle else torch.arange(self.n)
         for start in range(0, self.n, batch_size):
-            idx = order[start:start + batch_size]
+            idx = order[start : start + batch_size]
             data = {k: self._index(v, idx) for k, v in self.tensors.items()}
             labels = {self.label_key: data[self.label_key]}
             yield data, labels

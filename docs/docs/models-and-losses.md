@@ -12,10 +12,10 @@ A `Block` (`models/blocks.py`) reads named inputs from a shared
 ```python
 class Block(nn.Module):
     def forward(self, data_dict):
-        inputs = self._get_inputs(data_dict)      # read self.in_keys
+        inputs = self._get_inputs(data_dict)  # read self.in_keys
         outputs = self.forward_block(inputs)
         for key, out in zip(self.out_keys, outputs):
-            data_dict[f"{self.id}.{key}"] = out    # write id.out_key
+            data_dict[f"{self.id}.{key}"] = out  # write id.out_key
         return data_dict
 ```
 

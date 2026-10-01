@@ -9,9 +9,7 @@ runner applies each transition once.
 from typing import Any, Dict, Optional, Tuple
 
 
-def resolve_runtime_schedule_stage(
-    schedule, epoch: int
-) -> Optional[Tuple[int, Dict[str, Any]]]:
+def resolve_runtime_schedule_stage(schedule, epoch: int) -> Optional[Tuple[int, Dict[str, Any]]]:
     """Return ``(stage_index, state)`` if a milestone fires at ``epoch``, else None."""
     if schedule is None:
         return None

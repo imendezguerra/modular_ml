@@ -200,7 +200,9 @@ class LinearBlock(Block):
         super().__init__(id, in_keys, out_keys, in_dim, out_dim)
         self.linear = nn.Linear(in_dim, out_dim, bias=bias)
         self.activation = {
-            "tanh": nn.Tanh(), "relu": nn.ReLU(), "none": nn.Identity(),
+            "tanh": nn.Tanh(),
+            "relu": nn.ReLU(),
+            "none": nn.Identity(),
         }[activation]
         self.set_parameters(init_specs)
         self.freeze(freeze_specs)
@@ -278,8 +280,9 @@ class BroadcastBlock(Block):
 class ConnectivityLinear(nn.Module):
     """Linear layer with weights quantised to {-1, 0, +1} (straight-through)."""
 
-    def __init__(self, in_dim: int, out_dim: int, bias: bool = False,
-                 thr: float = 0.0, scale: float = 1.0):
+    def __init__(
+        self, in_dim: int, out_dim: int, bias: bool = False, thr: float = 0.0, scale: float = 1.0
+    ):
         super().__init__()
         self.weight = nn.Parameter(torch.randn(out_dim, in_dim))
         self.scale = scale
@@ -330,7 +333,9 @@ class MultiInputLinearBlock(Block):
         else:
             self.linear = nn.Linear(in_dim, out_dim, bias=bias)
         self.activation = {
-            "tanh": nn.Tanh(), "relu": nn.ReLU(), "none": nn.Identity(),
+            "tanh": nn.Tanh(),
+            "relu": nn.ReLU(),
+            "none": nn.Identity(),
         }[activation]
         self.input_modes = self._resolve_modes(input_modes)
         self._build_mask(self.input_modes)

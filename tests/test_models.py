@@ -8,19 +8,29 @@ from modular_ml.models.network import build_modular_model
 
 
 def _rnn_model() -> ModelConfig:
-    arch = ArchitectureConfig(modules={
-        "rnn": BlockSpec(
-            _block_target_="modular_ml.models.blocks.RNNBlock", id="rnn",
-            in_keys=["stim"], out_keys=["activity"], in_dim=3, out_dim=8,
-            params={"alpha": 0.2, "activation": "tanh"},
-            init={"linear_hh.weight": InitNormalRec(g=1.2)},
-            freeze=["linear_hh.weight"],
-        ),
-        "readout": BlockSpec(
-            _block_target_="modular_ml.models.blocks.LinearBlock", id="readout",
-            in_keys=["rnn.activity"], out_keys=["prediction"], in_dim=8, out_dim=2,
-        ),
-    })
+    arch = ArchitectureConfig(
+        modules={
+            "rnn": BlockSpec(
+                _block_target_="modular_ml.models.blocks.RNNBlock",
+                id="rnn",
+                in_keys=["stim"],
+                out_keys=["activity"],
+                in_dim=3,
+                out_dim=8,
+                params={"alpha": 0.2, "activation": "tanh"},
+                init={"linear_hh.weight": InitNormalRec(g=1.2)},
+                freeze=["linear_hh.weight"],
+            ),
+            "readout": BlockSpec(
+                _block_target_="modular_ml.models.blocks.LinearBlock",
+                id="readout",
+                in_keys=["rnn.activity"],
+                out_keys=["prediction"],
+                in_dim=8,
+                out_dim=2,
+            ),
+        }
+    )
     return ModelConfig(n_inputs=3, n_outputs=2, in_key="stim", architecture=arch, alpha=0.2)
 
 
@@ -49,7 +59,11 @@ def test_multi_input_modes():
     from modular_ml.models.blocks import MultiInputLinearBlock
 
     block = MultiInputLinearBlock(
-        id="mix", in_keys=["a", "b"], out_keys=["y"], in_dims=[3, 2], out_dim=4,
+        id="mix",
+        in_keys=["a", "b"],
+        out_keys=["y"],
+        in_dims=[3, 2],
+        out_dim=4,
         input_modes=["active", "disconnect"],
     )
     out = block({"a": torch.randn(5, 3), "b": torch.randn(5, 2)})

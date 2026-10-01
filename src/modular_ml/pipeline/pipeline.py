@@ -113,7 +113,9 @@ def run_experiment(experiment_path: Path) -> Dict:
         cfg_path = _resolve_stage_config_path(spec.config_path)
         config = load_config(cfg_path)
         runner = Runner(
-            config, use_wandb=True, notes=spec.notes,
+            config,
+            use_wandb=True,
+            notes=spec.notes,
             tags=["experiment", instance_id, spec.id],
         )
         _save_sim_config(cfg_path, runner)
@@ -126,7 +128,9 @@ def run_experiment(experiment_path: Path) -> Dict:
         elif spec.init_from_wandb_run:
             filename = spec.init_from_wandb_artifact_filename or "model_trained.pt"
             art_dir = wlog.download_artifact(
-                spec.init_from_wandb_run, filename.replace(".pt", ""), "model",
+                spec.init_from_wandb_run,
+                filename.replace(".pt", ""),
+                "model",
                 spec.init_from_wandb_version or "latest",
             )
             runner.load_model(Path(art_dir) / filename, weights_only_state=True)

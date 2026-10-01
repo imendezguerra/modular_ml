@@ -14,6 +14,7 @@ Or from Python:
 
 ```python
 from modular_ml.pipeline.pipeline import run_pipeline
+
 run_pipeline("configs/runs/config_tabular.yaml", tags=["demo"])
 ```
 
@@ -59,6 +60,7 @@ Load them back later with `processing/io.py`:
 
 ```python
 from modular_ml.processing.io import load_outputs_from_run, load_config_from_run
+
 out = load_outputs_from_run("glorious-sweep-7")
 cfg = load_config_from_run("glorious-sweep-7")
 ```
