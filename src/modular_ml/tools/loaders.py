@@ -16,7 +16,7 @@ PathLike = Union[str, Path]
 
 def yaml_load(path: PathLike) -> Dict[str, Any]:
     """Load a YAML file into a plain dict."""
-    with open(path, "r") as f:
+    with open(path, encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
@@ -24,7 +24,7 @@ def yaml_save(obj: Dict[str, Any], path: PathLike) -> None:
     """Save a dict to YAML, creating parent directories as needed."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "w") as f:
+    with open(path, "w", encoding="utf-8") as f:
         yaml.safe_dump(obj, f, sort_keys=False)
 
 

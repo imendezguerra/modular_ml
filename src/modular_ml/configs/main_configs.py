@@ -7,7 +7,6 @@ fully-typed :class:`Config` object: it composes config groups (via the
 ``DictConfig`` (used when merging sweep overrides before instantiation).
 """
 
-import os
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -43,15 +42,12 @@ def load_config(
     resolve: bool = True,
 ) -> Union[Config, DictConfig]:
     """Compose, resolve and instantiate a run config from a YAML file path."""
-    path = Path(path)
-    file_dir, file_name = path.parent, path.stem
+    path = Path(path).resolve()
 
-    # hydra.initialize wants a path relative to *this* file.
-    here = Path(__file__).resolve().parent
-    file_dir_rel = os.path.relpath(file_dir, start=here)
-
-    with hydra.initialize(config_path=file_dir_rel, version_base=None):
-        cfg = hydra.compose(config_name=file_name)
+    # Absolute config dir: a path relative to this file breaks on Windows when the
+    # config lives on another drive (os.path.relpath cannot cross drives).
+    with hydra.initialize_config_dir(config_dir=str(path.parent), version_base=None):
+        cfg = hydra.compose(config_name=path.stem)
 
     if resolve:
         OmegaConf.resolve(cfg)
