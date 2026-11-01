@@ -1,0 +1,93 @@
+site_name: modular_ml
+site_description: Config-driven PyTorch template with Hydra + dataclasses configs and full wandb tracking.
+site_url: https://imendezguerra.github.io/modular_ml/
+repo_url: https://github.com/imendezguerra/modular_ml
+repo_name: imendezguerra/modular_ml
+edit_uri: edit/main/docs/
+
+# Files outside docs/ that `mkdocs serve` should also live-reload on
+watch:
+  - README.md
+  - src/modular_ml
+
+nav:
+  - Home: index.md
+  - Getting started: getting-started.md
+  - User guide:
+      - Tutorial: user-guide/tutorial.md
+      - Tracking & reproducibility: user-guide/tracking-and-reproducibility.md
+      - Make it yours: user-guide/make-it-yours.md
+      - Repository structure: user-guide/repo-structure.md
+      - Concepts:
+          - Configuration: user-guide/configs.md
+          - Data: user-guide/data.md
+          - Models and losses: user-guide/models-and-losses.md
+          - Pipeline: user-guide/pipeline-usage.md
+          - Post-training analysis: user-guide/analysis.md
+          - Sweeps: user-guide/sweeps.md
+          - Experiments: user-guide/experiment-usage.md
+      - Troubleshooting: user-guide/troubleshooting.md
+  - API reference:
+      - configs: api/configs.md
+      - models: api/models.md
+      - losses: api/losses.md
+      - data: api/data.md
+      - pipeline: api/pipeline.md
+      - processing: api/processing.md
+      - tools: api/tools.md
+      - constants: api/constants.md
+
+theme:
+  name: material
+  features:
+    - content.code.copy
+    - navigation.sections
+    - search.highlight
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+markdown_extensions:
+  - admonition
+  - toc:
+      permalink: true
+  - pymdownx.highlight
+  - attr_list
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.snippets:
+      # Shared text lives in README.md and is pulled in by section
+      base_path: ["."]
+      check_paths: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            members_order: source
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_signature_annotations: true
+            separate_signature: true
+            heading_level: 2
+            filters:
+              - "!^_" # private helpers

@@ -7,10 +7,13 @@ Handles both data layouts produced by :mod:`modular_ml.data.data_gen`:
 
 ``load_split`` returns a :class:`TensorDataset`; iterate it with
 :meth:`TensorDataset.iter_batches`, which yields ``(data_dict, label_dict)``.
+The label tensor goes only to ``label_dict`` (the model never sees it), unless
+it is also the input key (e.g. an autoencoder). :meth:`TensorDataset.split`
+carves a validation set out of the train split.
 """
 
 from pathlib import Path
-from typing import Dict, Iterator, Tuple
+from typing import Dict, Iterator, Optional, Tuple
 
 import torch
 
@@ -31,7 +34,36 @@ class TensorDataset:
         self.n = tensors[in_key].shape[self.batch_axis]
 
     def _index(self, tensor: torch.Tensor, idx: torch.Tensor) -> torch.Tensor:
-        return tensor.index_select(self.batch_axis, idx)
+        return tensor.index_select(self.batch_axis, idx.to(tensor.device))
+
+    def _subset(self, idx: torch.Tensor) -> "TensorDataset":
+        tensors = {k: self._index(v, idx) for k, v in self.tensors.items()}
+        return TensorDataset(tensors, self.meta, self.in_key, self.label_key)
+
+    def _split_dicts(
+        self, tensors: Dict[str, torch.Tensor]
+    ) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
+        labels = {self.label_key: tensors[self.label_key]}
+        data = {k: v for k, v in tensors.items() if k != self.label_key or k == self.in_key}
+        return data, labels
+
+    def split(
+        self, frac: float, seed: int = 0
+    ) -> Tuple["TensorDataset", Optional["TensorDataset"]]:
+        """Split off a random ``frac`` of samples (along the batch axis).
+
+        Args:
+            frac: Fraction for the second split (e.g. validation).
+            seed: Seed for the permutation.
+
+        Returns:
+            ``(rest, held_out)``; ``held_out`` is None when it would be empty.
+        """
+        n_out = round(self.n * frac)
+        if n_out == 0:
+            return self, None
+        order = torch.randperm(self.n, generator=torch.Generator().manual_seed(seed))
+        return self._subset(order[n_out:]), self._subset(order[:n_out])
 
     def iter_batches(
         self, batch_size: int, shuffle: bool = True, generator: torch.Generator = None
@@ -40,14 +72,11 @@ class TensorDataset:
         order = torch.randperm(self.n, generator=generator) if shuffle else torch.arange(self.n)
         for start in range(0, self.n, batch_size):
             idx = order[start : start + batch_size]
-            data = {k: self._index(v, idx) for k, v in self.tensors.items()}
-            labels = {self.label_key: data[self.label_key]}
-            yield data, labels
+            yield self._split_dicts({k: self._index(v, idx) for k, v in self.tensors.items()})
 
     def full(self) -> Tuple[Dict[str, torch.Tensor], Dict[str, torch.Tensor]]:
         """Return the whole split as a single ``(data_dict, label_dict)``."""
-        data = dict(self.tensors)
-        return data, {self.label_key: data[self.label_key]}
+        return self._split_dicts(self.tensors)
 
 
 def load_split(cfg: DatasetConfig, split: str, dtype: torch.dtype = torch.float32) -> TensorDataset:

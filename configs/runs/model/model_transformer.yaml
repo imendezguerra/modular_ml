@@ -1,0 +1,42 @@
+# Attention model for the sequential task: causal transformer -> linear readout.
+# Same task, width and readout as model_rnn; swap with `model: model_transformer`
+# in the run config. `causal: true` keeps it a fair comparison with the RNN
+# (no step sees the future).
+_target_: modular_ml.configs.model_configs.ModelConfig
+name: transformer_sine
+n_inputs: ${dataset.in_dim}
+n_outputs: ${dataset.out_dim}
+in_key: ${dataset.in_key}
+out_key: prediction
+hidden_key: transformer.activity
+batch_size: 32
+epochs: 200
+
+architecture:
+  _target_: modular_ml.configs.model_configs.ArchitectureConfig
+  global_params:
+    hidden: 64
+  modules:
+    transformer:
+      _target_: modular_ml.configs.model_configs.BlockSpec
+      _block_target_: modular_ml.models.blocks.TransformerBlock
+      id: transformer
+      in_keys: ["${model.in_key}"]
+      out_keys: [activity]
+      in_dim: ${model.n_inputs}
+      out_dim: ${model.architecture.global_params.hidden}
+      params:
+        nhead: 4
+        num_layers: 2
+        causal: true
+        dropout: 0.1
+    readout:
+      _target_: modular_ml.configs.model_configs.BlockSpec
+      _block_target_: modular_ml.models.blocks.LinearBlock
+      id: readout
+      in_keys: [transformer.activity]
+      out_keys: [prediction]
+      in_dim: ${model.architecture.global_params.hidden}
+      out_dim: ${model.n_outputs}
+      params:
+        activation: none

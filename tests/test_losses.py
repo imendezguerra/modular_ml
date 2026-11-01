@@ -1,10 +1,12 @@
 """Modular loss: criteria, scheduling, weighting, parameter regularisers."""
 
+import pytest
 import torch
 
+from modular_ml.configs.enums import LossCriterion
 from modular_ml.configs.model_configs import ArchitectureConfig, BlockSpec, ModelConfig
 from modular_ml.configs.optim_configs import LossSpec, OptimizerConfig
-from modular_ml.losses.loss import _schedule_weight, build_modular_loss
+from modular_ml.losses.loss import LossModule, _schedule_weight, build_modular_loss
 from modular_ml.models.network import build_modular_model
 
 
@@ -81,3 +83,41 @@ def test_cross_entropy_criterion():
     logits = torch.randn(8, 3)
     total, _ = loss({"logits": logits}, {"lab": torch.randint(0, 3, (8,))})
     assert total.item() > 0
+
+
+def test_criterion_enum_matches_table():
+    assert {c.value for c in LossCriterion} == set(LossModule.CRITERION_FUNCS)
+
+
+@pytest.mark.parametrize(
+    "criterion, labels, params",
+    [
+        ("huber", torch.randn(6, 4, 2), {"delta": 0.5}),
+        ("bce_with_logits", torch.randint(0, 2, (6, 4, 2)), {"pos_weight": [1.0, 3.0]}),
+        ("cosine", torch.randn(6, 4, 2), {}),
+    ],
+)
+def test_new_supervised_criteria(criterion, labels, params):
+    loss = build_modular_loss(
+        OptimizerConfig(
+            losses={
+                "t": LossSpec(
+                    id="t", criterion=criterion, in_keys=["p"], label_key="y", params=params
+                )
+            }
+        )
+    )
+    total, _ = loss({"p": torch.randn(6, 4, 2)}, {"y": labels})
+    assert total.dim() == 0 and torch.isfinite(total)
+
+
+def test_criterion_params_reach_the_function():
+    logits, labels = torch.randn(8, 3), torch.randint(0, 3, (8,))
+    spec = {"id": "ce", "criterion": "cross_entropy", "in_keys": ["z"], "label_key": "y"}
+    plain = build_modular_loss(OptimizerConfig(losses={"ce": LossSpec(**spec)}))
+    smooth = build_modular_loss(
+        OptimizerConfig(
+            losses={"ce": LossSpec(**spec, params={"label_smoothing": 0.2, "weight": [1, 2, 3]})}
+        )
+    )
+    assert plain({"z": logits}, {"y": labels})[0] != smooth({"z": logits}, {"y": labels})[0]

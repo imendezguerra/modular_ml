@@ -9,14 +9,17 @@ schedule(epoch)`` and sums them.
 
 import bisect
 import math
-from typing import ClassVar, Dict, List, Optional, Tuple, Union
+from typing import Any, ClassVar, Dict, List, Optional, Tuple, Union
 
 import hydra
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 from modular_ml.configs.optim_configs import LossSpec, OptimizerConfig
 from modular_ml.losses.regularisers import (
+    _bce_with_logits,
+    _cosine_loss,
     _cross_entropy,
     _effective_rank,
     _monotonicity_loss,
@@ -78,9 +81,13 @@ class LossModule(nn.Module):
     """A single loss term applied to one or more data-dict keys."""
 
     CRITERION_FUNCS: ClassVar[dict] = {
-        "mse": nn.MSELoss(),
-        "l1": nn.L1Loss(),
+        "mse": F.mse_loss,
+        "l1": F.l1_loss,
+        "huber": F.huber_loss,
         "cross_entropy": _cross_entropy,
+        "bce_with_logits": _bce_with_logits,
+        "cosine": _cosine_loss,
+        "norm1": lambda x: x.norm(1),
         "norm2": lambda x: x.norm(2),
         "norm_row": _norm_per_row,
         "pow2": lambda x: x.pow(2).mean(),
@@ -90,7 +97,7 @@ class LossModule(nn.Module):
         "temporal_smoothness": _temporal_smoothness_loss,
         "effective_rank": _effective_rank,
     }
-    SUPERVISED: ClassVar[set] = {"mse", "l1", "cross_entropy"}
+    SUPERVISED: ClassVar[set] = {"mse", "l1", "huber", "cross_entropy", "bce_with_logits", "cosine"}
 
     def __init__(
         self,
@@ -101,7 +108,22 @@ class LossModule(nn.Module):
         requires_model: bool,
         reg_weight: float,
         use_reg: float = 1.0,
+        **criterion_kwargs: Any,
     ) -> None:
+        """Build one loss term.
+
+        Args:
+            id: Term name used in logs.
+            criterion: Key of ``CRITERION_FUNCS`` (string or ``LossCriterion``).
+            in_keys: Data-dict keys (or module ids when ``requires_model``).
+            label_key: Label key for supervised criteria; ignored otherwise.
+            requires_model: Read module parameters instead of the data dict.
+            reg_weight: Term weight.
+            use_reg: On/off multiplier, kept separate for sweeps.
+            **criterion_kwargs: ``LossSpec.params``, passed to the criterion
+                (e.g. ``delta`` for ``huber``, ``label_smoothing`` for
+                ``cross_entropy``).
+        """
         super().__init__()
         # Accept either a LossCriterion enum or a plain string.
         criterion = getattr(criterion, "value", criterion)
@@ -114,6 +136,7 @@ class LossModule(nn.Module):
         self.reg_weight = reg_weight
         self.use_reg = use_reg
         self.label_key = label_key if criterion in self.SUPERVISED else None
+        self.criterion_kwargs = criterion_kwargs
         self.schedule: Dict = {}
 
     @property
@@ -121,8 +144,8 @@ class LossModule(nn.Module):
         return self.CRITERION_FUNCS[self.criterion]
 
     def _apply_criterion(self, x, labels=None):
-        fn = self.criterion_fun
-        return fn(x, labels) if labels is not None else fn(x)
+        fn, kw = self.criterion_fun, self.criterion_kwargs
+        return fn(x, labels, **kw) if labels is not None else fn(x, **kw)
 
     def forward(
         self,

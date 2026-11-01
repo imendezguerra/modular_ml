@@ -8,4 +8,4 @@ works from anywhere.
 from modular_ml.tools import hydra_utils as _hydra_utils  # noqa: F401  (registers resolvers)
 
 __all__ = ["__version__"]
-__version__ = "0.1.0"
+__version__ = "1.0.0"

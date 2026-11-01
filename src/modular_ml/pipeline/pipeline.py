@@ -8,19 +8,19 @@ sweeps/experiments. wandb is required; sweeps use ``wandb.sweep`` + ``wandb.agen
 from pathlib import Path
 from typing import Dict, List, Optional
 
-import hydra
 import typer
 import wandb
 from loguru import logger
-from omegaconf import OmegaConf
+from omegaconf import DictConfig, OmegaConf
 
-from modular_ml.configs.main_configs import Config, load_config
-from modular_ml.constants import CONFIG_DIR, OUTPUT_DIR, PROJECT
+from modular_ml.configs.main_configs import instantiate_config, load_config, merge_overrides
+from modular_ml.constants import CONFIG_DIR, PROJECT
 from modular_ml.pipeline.experiment_tracking import (
     build_manifest,
     build_stage_entry,
     new_instance_id,
-    write_manifest_files,
+    sha256_file,
+    write_manifest,
 )
 from modular_ml.pipeline.runner import Runner
 from modular_ml.tools import logging as wlog
@@ -30,18 +30,12 @@ app = typer.Typer(add_completion=False, help="modular_ml pipeline commands.")
 
 
 # --- helpers -----------------------------------------------------------------
-def _save_sim_config(config_path: Path, runner: Runner) -> None:
-    """Save the resolved run config next to the outputs and log it to wandb."""
-    raw = load_config(config_path, instantiate=False, resolve=True)
+def _save_sim_config(raw_cfg: DictConfig, runner: Runner) -> None:
+    """Save the resolved config the run was built from and log it to wandb."""
     out_path = runner.output_dir / "sim_config.yaml"
-    OmegaConf.save(config=raw, f=out_path)
+    OmegaConf.save(config=raw_cfg, f=out_path)
     if runner.use_wandb:
         wlog.log_artifact(out_path, "config", "config")
-
-
-def _dotlist(flat: Dict) -> List[str]:
-    """Convert a flat {dotted_key: value} mapping to a dotlist for OmegaConf."""
-    return [f"{k}={v}" for k, v in flat.items()]
 
 
 # --- single run --------------------------------------------------------------
@@ -52,9 +46,9 @@ def run_pipeline(
     notes: Optional[str] = None,
 ) -> Runner:
     """Train + test a single run config and log everything to wandb."""
-    config: Config = load_config(config_path)
-    runner = Runner(config, use_wandb=use_wandb, tags=tags, notes=notes)
-    _save_sim_config(Path(config_path), runner)
+    raw = load_config(config_path, instantiate=False)
+    runner = Runner(instantiate_config(raw), use_wandb=use_wandb, tags=tags, notes=notes)
+    _save_sim_config(raw, runner)
     runner.run_train()
     runner.run_test()
     runner.compute_objective()
@@ -80,11 +74,9 @@ def run_sweep(
 
     def _sweep_run() -> None:
         wandb.init(project=project)
-        overrides = OmegaConf.from_dotlist(_dotlist(dict(wandb.config)))
-        merged = OmegaConf.merge(base_cfg, overrides)
-        OmegaConf.resolve(merged)
-        config = hydra.utils.instantiate(merged, _convert_="all")
-        runner = Runner(config, use_wandb=True, is_sweep=True)
+        raw = merge_overrides(base_cfg, dict(wandb.config))
+        runner = Runner(instantiate_config(raw), use_wandb=True)
+        _save_sim_config(raw, runner)
         runner.run_train()
         runner.run_test()
         runner.compute_objective()
@@ -102,26 +94,38 @@ def _resolve_stage_config_path(config_path) -> Path:
 
 
 def run_experiment(experiment_path: Path) -> Dict:
-    """Run a multi-stage experiment and write a provenance manifest."""
+    """Run a multi-stage experiment and log its provenance manifest to wandb.
+
+    After each stage, the manifest so far is written to the stage's output dir
+    and logged as an ``experiment`` artifact of that stage's run, so the last
+    stage's run holds the complete manifest.
+    """
     exp_cfg = load_config(experiment_path)
     stages = list(exp_cfg.runs.values())
+    ids = [spec.id for spec in stages]
+    for i, spec in enumerate(stages):
+        if spec.load_params_from and spec.load_params_from not in ids[:i]:
+            raise ValueError(
+                f"Stage '{spec.id}': load_params_from '{spec.load_params_from}' "
+                "is not an earlier stage."
+            )
     instance_id = new_instance_id()
     stage_entries: List[Dict] = []
     prev_outputs: Dict[str, Path] = {}
 
     for i, spec in enumerate(stages):
         cfg_path = _resolve_stage_config_path(spec.config_path)
-        config = load_config(cfg_path)
+        raw = load_config(cfg_path, instantiate=False)
         runner = Runner(
-            config,
+            instantiate_config(raw),
             use_wandb=True,
             notes=spec.notes,
             tags=["experiment", instance_id, spec.id],
         )
-        _save_sim_config(cfg_path, runner)
+        _save_sim_config(raw, runner)
 
         # Initialise weights from a previous stage or an external wandb run.
-        if spec.load_params_from and spec.load_params_from in prev_outputs:
+        if spec.load_params_from:
             ckpt = prev_outputs[spec.load_params_from] / "model_trained.pt"
             runner.load_model(ckpt, weights_only_state=True)
             logger.info(f"Stage '{spec.id}' initialised from '{spec.load_params_from}'.")
@@ -136,20 +140,24 @@ def run_experiment(experiment_path: Path) -> Dict:
             runner.load_model(Path(art_dir) / filename, weights_only_state=True)
 
         mode = getattr(spec.run_mode, "value", spec.run_mode)
-        if mode in ("train", "train_test", "retrain", "retrain_test"):
+        if mode in ("train", "train_test"):
             runner.run_train()
-        if mode in ("test", "train_test", "retrain_test"):
+        if mode in ("test", "train_test"):
             runner.run_test()
         runner.compute_objective()
 
-        stage_entries.append(build_stage_entry(spec, i, len(stages), runner.run_name))
+        stage_entries.append(
+            build_stage_entry(
+                spec, i, len(stages), runner.run_id, runner.run_name, sha256_file(cfg_path)
+            )
+        )
         prev_outputs[spec.id] = runner.output_dir
+        manifest = build_manifest(Path(experiment_path), instance_id, stage_entries)
+        manifest_path = write_manifest(manifest, runner.output_dir)
+        wlog.log_artifact(manifest_path, "experiment", "manifest", metadata=manifest)
         wlog.finish()
 
-    manifest = build_manifest(Path(experiment_path), instance_id, stage_entries)
-    out_dir = OUTPUT_DIR / f"experiment_{instance_id}"
-    paths = write_manifest_files(manifest, out_dir)
-    logger.info(f"Experiment manifest written to {paths['manifest']}")
+    logger.info(f"Experiment manifest written to {manifest_path}")
     return manifest
 
 

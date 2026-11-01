@@ -1,9 +1,9 @@
 """Provenance for multi-stage experiments.
 
 Builds a resolved execution manifest (which stages ran, their config hashes,
-wandb run names and checkpoint sources) and writes it to disk so an experiment
-is fully reproducible. The manifest is logged to wandb as an ``experiment``
-artifact by the pipeline.
+wandb run ids and checkpoint sources) and writes it to disk so an experiment is
+fully reproducible. The pipeline logs it to wandb as an ``experiment`` artifact
+after every stage.
 """
 
 import hashlib
@@ -11,6 +11,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List
 
+from modular_ml.configs.experiment_configs import RunSpec
 from modular_ml.tools.loaders import yaml_save
 
 
@@ -27,17 +28,33 @@ def new_instance_id() -> str:
 
 
 def build_stage_entry(
-    run_spec, run_index: int, run_count: int, wandb_run_name: str
+    run_spec: RunSpec,
+    run_index: int,
+    run_count: int,
+    wandb_run_id: str,
+    wandb_run_name: str,
+    config_sha256: str,
 ) -> Dict[str, Any]:
-    """Describe one executed stage for the manifest."""
+    """Describe one executed stage for the manifest.
+
+    Args:
+        run_spec: The stage's ``RunSpec``.
+        run_index: Zero-based stage index.
+        run_count: Number of stages.
+        wandb_run_id: Unique id of the stage's wandb run.
+        wandb_run_name: Display name of the stage's wandb run.
+        config_sha256: Hash of the stage's run config file.
+    """
     return {
         "run_spec_id": run_spec.id,
         "run_spec_index": run_index + 1,
         "run_spec_count": run_count,
         "config_path": str(run_spec.config_path),
+        "config_sha256": config_sha256,
         "run_mode": getattr(run_spec.run_mode, "value", run_spec.run_mode),
         "load_params_from": run_spec.load_params_from,
         "init_from_wandb_run": run_spec.init_from_wandb_run,
+        "wandb_run_id": wandb_run_id,
         "wandb_run_name": wandb_run_name,
         "notes": run_spec.notes,
     }
@@ -59,13 +76,8 @@ def build_manifest(
     }
 
 
-def write_manifest_files(manifest: Dict[str, Any], output_dir: Path) -> Dict[str, Path]:
-    """Write the manifest and a run-name map; return their paths."""
-    output_dir = Path(output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    manifest_path = output_dir / "experiment_manifest.yaml"
-    yaml_save(manifest, manifest_path)
-    run_names = {s["run_spec_id"]: s["wandb_run_name"] for s in manifest["stages"]}
-    names_path = output_dir / "exp_run_names.yaml"
-    yaml_save(run_names, names_path)
-    return {"manifest": manifest_path, "run_names": names_path}
+def write_manifest(manifest: Dict[str, Any], output_dir: Path) -> Path:
+    """Write ``experiment_manifest.yaml`` to ``output_dir`` and return its path."""
+    path = Path(output_dir) / "experiment_manifest.yaml"
+    yaml_save(manifest, path)
+    return path

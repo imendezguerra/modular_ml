@@ -54,15 +54,23 @@ defaults:
   - model: model_rnn
   - optim: optim_mse
   - logger: logger_reg
-  - processing: pca_rnn
+  - processing: analysis_rnn
   - _self_
 seed: 0
 ```
 
 Each entry selects a file from a group directory (e.g. `model/model_rnn.yaml`)
-and mounts it under that key. Swap `model_rnn` for another file to change the
-architecture without touching anything else. `_self_` last means values in this
+and mounts it under that key. Swap `model_rnn` for another file (e.g.
+`model_gru`, `model_transformer`) to change the architecture without touching
+anything else: the shared optim / processing / logger configs read the model's
+hidden activity through `${model.hidden_key}`. `_self_` last means values in this
 file win over the groups.
+
+The same swap works from Python with Hydra overrides:
+
+```python
+cfg = load_config("configs/runs/config_sequential.yaml", overrides=["model=model_gru"])
+```
 
 ## Interpolation and resolvers
 

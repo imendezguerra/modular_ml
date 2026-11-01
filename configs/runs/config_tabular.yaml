@@ -5,7 +5,7 @@ defaults:
   - model: model_mlp
   - optim: optim_ce
   - logger: logger_clf
-  - processing: pca_mlp
+  - processing: analysis_mlp
   - _self_
 
 seed: 0

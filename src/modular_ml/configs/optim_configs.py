@@ -29,6 +29,7 @@ class LossSpec:
     # without needing 0.0 as a sweepable value.
     use_reg: float = 1.0
 
+    # Extra criterion kwargs (e.g. ``delta`` for huber, ``label_smoothing`` for CE).
     params: Dict[str, Any] = field(default_factory=dict)
     # Optional epoch schedule for this term's weight (train only by default).
     schedule: Dict[str, Any] = field(default_factory=dict)

@@ -7,7 +7,7 @@ defaults:
   - model: model_rnn
   - optim: optim_mse
   - logger: logger_reg
-  - processing: pca_rnn
+  - processing: analysis_rnn
   - _self_
 
 seed: 0

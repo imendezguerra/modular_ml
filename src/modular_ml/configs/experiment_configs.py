@@ -21,7 +21,7 @@ class RunSpec:
     config_path: Union[str, Path] = ""
     # Initialise weights from a previous stage (by run-spec id) within this run.
     load_params_from: Optional[str] = None
-    # Or initialise from an existing wandb run's checkpoint artifact.
+    # Or initialise from an existing wandb run's checkpoint artifact (by run id).
     init_from_wandb_run: Optional[str] = None
     init_from_wandb_artifact_filename: Optional[str] = None
     init_from_wandb_version: Optional[str] = None

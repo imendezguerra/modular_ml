@@ -29,6 +29,26 @@ def test_load_split_sequential_batching(sine_dir):
     assert labels["target"].shape[1] == 8
 
 
+def test_labels_are_not_model_inputs(sine_dir):
+    ds = load_split(DatasetConfig(name="sine", data_dir=str(sine_dir)), "train")
+    data, labels = next(ds.iter_batches(8))
+    assert "target" not in data and "target" in labels
+    # Unless the label is also the input (e.g. an autoencoder).
+    ds.label_key = "stim"
+    data, labels = ds.full()
+    assert "stim" in data and "stim" in labels
+
+
+def test_train_val_split(sine_dir):
+    ds = load_split(DatasetConfig(name="sine", data_dir=str(sine_dir)), "train")
+    train, val = ds.split(0.25, seed=0)
+    assert train.n + val.n == ds.n and val.n == round(0.25 * ds.n)
+    # Disjoint trials: no trial of val appears in train.
+    flat = lambda d: {tuple(d.tensors["target"][:, i, 0].tolist()) for i in range(d.n)}  # noqa: E731
+    assert not flat(train) & flat(val)
+    assert ds.split(0.0)[1] is None
+
+
 def test_load_split_tabular_batching(blobs_dir):
     cfg = DatasetConfig(name="blobs", data_dir=str(blobs_dir))
     ds = load_split(cfg, "train")

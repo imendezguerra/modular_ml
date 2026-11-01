@@ -1,0 +1,11 @@
+# Post-test analysis on the learned encoder representation: PCA, plus a linear
+# probe that decodes the class label from it.
+_target_: modular_ml.configs.processing_configs.ProcessingConfig
+run_pca: true
+pca_keys: [encoder.repr]
+pca_dims: 10
+evr_threshold: 0.95
+run_probe: true
+probe_keys: [encoder.repr]
+probe_targets: ["label.${dataset.label_key}"]
+probe_folds: 5

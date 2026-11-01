@@ -2,10 +2,15 @@
 
 All operate on a single tensor and return a scalar. They are domain-agnostic
 (no motor-unit / recruitment specifics): smoothness, monotonicity, trend,
-row-norm uniformity, and effective rank (participation ratio).
+row-norm uniformity, and effective rank (participation ratio). Supervised
+criteria with extra handling (shape/dtype tolerance, list-valued weights) also
+live here.
 """
 
+from typing import Optional, Sequence
+
 import torch
+import torch.nn.functional as F
 
 
 def _temporal_smoothness_loss(x: torch.Tensor, dim: int = 0, p: float = 2.0) -> torch.Tensor:
@@ -54,9 +59,42 @@ def _effective_rank(x: torch.Tensor) -> torch.Tensor:
     return -pr
 
 
-def _cross_entropy(logits: torch.Tensor, labels: torch.Tensor) -> torch.Tensor:
-    """Cross-entropy that tolerates sequence ([T,B,C]) or tabular ([B,C]) logits."""
+def _as_tensor(value: Optional[Sequence[float]], ref: torch.Tensor) -> Optional[torch.Tensor]:
+    """Turn a list from YAML (e.g. class weights) into a tensor matching ``ref``."""
+    return None if value is None else torch.as_tensor(value, dtype=ref.dtype, device=ref.device)
+
+
+def _cross_entropy(
+    logits: torch.Tensor,
+    labels: torch.Tensor,
+    weight: Optional[Sequence[float]] = None,
+    **kwargs,
+) -> torch.Tensor:
+    """Cross-entropy that tolerates sequence ([T,B,C]) or tabular ([B,C]) logits.
+
+    Args:
+        logits: Class scores, last dim is classes.
+        labels: Integer class labels, any shape matching ``logits[..., 0]``.
+        weight: Optional per-class weights.
+        **kwargs: Passed to ``F.cross_entropy`` (e.g. ``label_smoothing``).
+    """
     c = logits.shape[-1]
     logits_flat = logits.reshape(-1, c)
     labels_flat = labels.reshape(-1).long()
-    return torch.nn.functional.cross_entropy(logits_flat, labels_flat)
+    return F.cross_entropy(logits_flat, labels_flat, weight=_as_tensor(weight, logits), **kwargs)
+
+
+def _bce_with_logits(
+    logits: torch.Tensor,
+    targets: torch.Tensor,
+    pos_weight: Optional[Sequence[float]] = None,
+) -> torch.Tensor:
+    """Binary / multi-label cross-entropy on logits; targets are cast to float."""
+    return F.binary_cross_entropy_with_logits(
+        logits, targets.to(logits.dtype), pos_weight=_as_tensor(pos_weight, logits)
+    )
+
+
+def _cosine_loss(x: torch.Tensor, target: torch.Tensor, dim: int = -1) -> torch.Tensor:
+    """``1 - cosine similarity`` along ``dim``, averaged."""
+    return 1.0 - F.cosine_similarity(x, target, dim=dim).mean()

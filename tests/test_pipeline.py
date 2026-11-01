@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+import torch
 
 from modular_ml.configs.dataset_configs import DatasetConfig
 from modular_ml.configs.log_configs import LoggerConfig, MetricSpec, ObjectiveConfig
@@ -10,9 +11,10 @@ from modular_ml.configs.main_configs import Config
 from modular_ml.configs.model_configs import ArchitectureConfig, BlockSpec, ModelConfig
 from modular_ml.configs.optim_configs import LossSpec, OptimizerConfig
 from modular_ml.configs.processing_configs import ProcessingConfig
+from modular_ml.constants import OUTPUT_DIR
 from modular_ml.pipeline.pipeline import run_experiment
 from modular_ml.pipeline.runner import Runner
-from modular_ml.tools.loaders import yaml_save
+from modular_ml.tools.loaders import yaml_load, yaml_save
 
 
 def _sine_config(data_dir: Path, epochs: int = 4) -> Config:
@@ -62,10 +64,16 @@ def _sine_config(data_dir: Path, epochs: int = 4) -> Config:
                 ),
             }
         ),
-        processing=ProcessingConfig(run_pca=True, pca_keys=["rnn.activity"]),
+        processing=ProcessingConfig(
+            run_pca=True,
+            pca_keys=["rnn.activity"],
+            run_probe=True,
+            probe_keys=["rnn.activity"],
+            probe_targets=["stim", "label.target"],
+        ),
         logger=LoggerConfig(
             objective=ObjectiveConfig(
-                metrics=[MetricSpec(name="test/corrcoef", weight=1.0, epoch_reduction="last")]
+                metrics=[MetricSpec(name="val/corrcoef", weight=1.0, epoch_reduction="last")]
             )
         ),
     )
@@ -77,7 +85,12 @@ def test_runner_sine_train_test(sine_dir):
     metrics = runner.run_test()
     assert "test/total_loss" in metrics
     assert "test/corrcoef" in metrics
-    assert runner.compute_objective() is not None
+    assert "val/corrcoef" in runner._metric_history
+    assert "val/total_loss" in runner._metric_history
+    assert "probe/r2.rnn.activity->stim" in runner._metric_history
+    assert "probe/r2.rnn.activity->label.target" in runner._metric_history
+    # The sweep objective reads validation, not test, metrics.
+    assert runner.compute_objective() == runner._metric_history["val/corrcoef"][-1]
     assert (runner.output_dir / "test_outputs.h5").exists()
     assert (runner.output_dir / "model_trained.pt").exists()
 
@@ -228,6 +241,34 @@ def test_two_stage_experiment(sine_dir, tmp_path):
     manifest = run_experiment(exp_cfg)
     assert len(manifest["stages"]) == 2
     assert manifest["stages"][1]["load_params_from"] == "pretrain"
+    last = manifest["stages"][-1]
+    assert last["wandb_run_id"] and last["config_sha256"]
+    # The complete manifest sits with the last stage's run.
+    assert (OUTPUT_DIR / last["wandb_run_id"] / "experiment_manifest.yaml").exists()
+
+    # A stage may only load from an earlier stage.
+    bad = yaml_load(exp_cfg)
+    bad["runs"]["finetune"]["load_params_from"] = "missing"
+    yaml_save(bad, exp_cfg)
+    with pytest.raises(ValueError, match="earlier stage"):
+        run_experiment(exp_cfg)
+
+
+def test_schedule_unfreezes_without_resetting_optimizer(sine_dir):
+    from modular_ml.configs.model_configs import RuntimeScheduleConfig
+
+    cfg = _sine_config(sine_dir, epochs=2)
+    rnn = cfg.model.architecture.modules["rnn"]
+    rnn.freeze = ["linear_hh.weight"]
+    cfg.model.architecture.schedule = RuntimeScheduleConfig(
+        milestones=[1], states=[{"modules": {"rnn": {"unfreeze": ["linear_hh.weight"]}}}]
+    )
+    runner = Runner(cfg, use_wandb=False)
+    optimizer = runner.optimizer
+    w0 = runner.model.get_module("rnn").linear_hh.weight.detach().clone()
+    runner.run_train()
+    assert runner.optimizer is optimizer
+    assert not torch.equal(w0, runner.model.get_module("rnn").linear_hh.weight)
 
 
 if __name__ == "__main__":
