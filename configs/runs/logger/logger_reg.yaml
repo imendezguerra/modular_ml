@@ -1,12 +1,11 @@
-# Logger for the regression task. The sweep objective maximises test correlation.
+# Logger for the regression task. The sweep objective maximises validation correlation
+# (held out from the train split); the test split is only for the final report.
 _target_: modular_ml.configs.log_configs.LoggerConfig
-wandb_groups: [train, test, pca]
-activation_keys: [rnn.activity]
 objective:
   _target_: modular_ml.configs.log_configs.ObjectiveConfig
   combination: weighted_mean
   metrics:
     - _target_: modular_ml.configs.log_configs.MetricSpec
-      name: test/corrcoef
+      name: val/corrcoef
       weight: 1.0
       epoch_reduction: last

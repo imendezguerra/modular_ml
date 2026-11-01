@@ -33,6 +33,9 @@ class DatasetConfig:
     out_key: str = "target"
     label_key: str = "target"
 
+    # Fraction of the train split held out for validation (sweep objectives).
+    val_frac: float = 0.2
+
     def __post_init__(self):
         if isinstance(self.task_type, str):
             self.task_type = enums.TaskType(self.task_type)

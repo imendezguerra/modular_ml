@@ -20,8 +20,11 @@ parameters:
 ```
 
 The parameter keys are **dotted paths into the composed config**. They are
-merged into the config *before* resolution, so interpolations downstream (e.g.
-the recurrent gain `g` feeding an `InitNormalRec`) pick up the swept value.
+merged into the config *before* resolution (`merge_overrides`), so interpolations
+downstream (e.g. the recurrent gain `g` feeding an `InitNormalRec`) pick up the
+swept value. An unknown key raises, so a typo fails instead of being ignored.
+Each sweep run logs its full resolved config, both to the wandb run config and
+as a `sim_config.yaml` artifact.
 
 ## The objective
 
@@ -33,7 +36,7 @@ logger config:
 objective:
   combination: weighted_mean
   metrics:
-    - name: test/corrcoef
+    - name: val/corrcoef
       weight: 1.0
       epoch_reduction: last
 ```

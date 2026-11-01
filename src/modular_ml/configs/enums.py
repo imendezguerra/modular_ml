@@ -3,17 +3,6 @@
 from enum import Enum
 
 
-class DType(str, Enum):
-    float32 = "float32"
-    float64 = "float64"
-
-
-class Nonlinearity(str, Enum):
-    tanh = "tanh"
-    relu = "relu"
-    none = "none"
-
-
 class OptimizerType(str, Enum):
     Adam = "Adam"
     AdamW = "AdamW"
@@ -28,8 +17,13 @@ class TaskType(str, Enum):
 class LossCriterion(str, Enum):
     mse = "mse"
     l1 = "l1"
+    huber = "huber"
     cross_entropy = "cross_entropy"
+    bce_with_logits = "bce_with_logits"
+    cosine = "cosine"
+    norm1 = "norm1"
     norm2 = "norm2"
+    norm_row = "norm_row"
     pow2 = "pow2"
     var = "var"
     monotonicity = "monotonicity"
@@ -42,8 +36,6 @@ class RunMode(str, Enum):
     train = "train"
     test = "test"
     train_test = "train_test"
-    retrain = "retrain"
-    retrain_test = "retrain_test"
 
 
 class InitLoadMode(str, Enum):

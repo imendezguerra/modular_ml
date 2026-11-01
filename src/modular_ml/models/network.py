@@ -1,17 +1,17 @@
 """ModularNet and the config-driven network factory.
 
 ``build_modular_model`` turns an :class:`ArchitectureConfig` into a ``ModularNet``
-by Hydra-instantiating each block spec. The net runs its blocks in declared
-order, threading a single ``DataDict`` through them. ``apply_runtime_schedule``
+by Hydra-instantiating each block spec; the spec's ``init`` and ``freeze`` are
+passed to the block, which applies them once in its constructor. The net runs its
+blocks in declared order, threading a single ``DataDict`` through them. ``apply_runtime_schedule``
 applies epoch-triggered freeze/unfreeze/input-mode changes.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Tuple
 
 import hydra
 from torch import nn
 
-from modular_ml.configs.init_configs import InitSpecs
 from modular_ml.configs.model_configs import BlockSpec, ModelConfig
 from modular_ml.models.blocks import Block, DataDict
 
@@ -19,33 +19,11 @@ from modular_ml.models.blocks import Block, DataDict
 class ModularNet(nn.Module):
     """A sequence of :class:`Block` modules sharing one data dict."""
 
-    def __init__(
-        self,
-        modules: List[Block],
-        module_ids: List[str],
-        module_init_specs: Optional[Dict[str, Dict[str, InitSpecs]]] = None,
-        module_freeze_specs: Optional[Dict[str, List[str]]] = None,
-    ) -> None:
+    def __init__(self, modules: List[Block], module_ids: List[str]) -> None:
         super().__init__()
         self.modules_seq = nn.ModuleList(modules)
         self.module_ids = module_ids
         self.module_map = dict(zip(module_ids, self.modules_seq))
-        self.module_init_specs = module_init_specs or {}
-        self.module_freeze_specs = module_freeze_specs or {}
-        self._apply_init()
-        self._apply_freeze()
-
-    def _apply_init(self) -> None:
-        for mid, module in self.module_map.items():
-            specs = self.module_init_specs.get(mid)
-            if specs and hasattr(module, "set_parameters"):
-                module.set_parameters(specs)
-
-    def _apply_freeze(self) -> None:
-        for mid, module in self.module_map.items():
-            freeze = self.module_freeze_specs.get(mid)
-            if freeze and hasattr(module, "freeze"):
-                module.freeze(freeze)
 
     def get_module(self, module_id: str) -> Block:
         """Return a block by id."""
@@ -94,10 +72,8 @@ class ModularNet(nn.Module):
         return data_dict
 
 
-def _instantiate_block(
-    spec: BlockSpec, idx: int
-) -> Tuple[str, Block, Dict[str, InitSpecs], List[str]]:
-    """Hydra-instantiate one block from its spec, flattening params/kwargs."""
+def _instantiate_block(spec: BlockSpec, idx: int) -> Tuple[str, Block]:
+    """Hydra-instantiate one block, passing its params, init and freeze specs."""
     kwargs: Dict[str, Any] = {
         "_target_": spec._block_target_,
         "id": spec.id or f"block_{idx}",
@@ -112,8 +88,7 @@ def _instantiate_block(
         kwargs["out_dim"] = spec.out_dim
     kwargs["init_specs"] = getattr(spec, "init", {}) or {}
     kwargs["freeze_specs"] = list(getattr(spec, "freeze", []) or [])
-    module = hydra.utils.instantiate(kwargs)
-    return kwargs["id"], module, kwargs["init_specs"], kwargs["freeze_specs"]
+    return kwargs["id"], hydra.utils.instantiate(kwargs)
 
 
 def build_modular_model(model_cfg: ModelConfig) -> ModularNet:
@@ -122,13 +97,5 @@ def build_modular_model(model_cfg: ModelConfig) -> ModularNet:
     if not specs:
         raise ValueError("ArchitectureConfig must define at least one BlockSpec.")
 
-    modules, ids = [], []
-    init_specs: Dict[str, Dict[str, InitSpecs]] = {}
-    freeze_specs: Dict[str, List[str]] = {}
-    for idx, spec in enumerate(specs):
-        mid, module, m_init, m_freeze = _instantiate_block(spec, idx)
-        ids.append(mid)
-        modules.append(module)
-        init_specs[mid] = m_init
-        freeze_specs[mid] = m_freeze
-    return ModularNet(modules, ids, init_specs, freeze_specs)
+    ids, modules = zip(*(_instantiate_block(spec, idx) for idx, spec in enumerate(specs)))
+    return ModularNet(list(modules), list(ids))

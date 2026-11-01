@@ -8,6 +8,7 @@ n_inputs: ${dataset.in_dim}
 n_outputs: ${dataset.out_dim}
 in_key: ${dataset.in_key}
 out_key: prediction
+hidden_key: rnn.activity
 tau_s: 0.05
 dt_s: ${dataset.dt}
 alpha: ${divide:${model.dt_s},${model.tau_s}}

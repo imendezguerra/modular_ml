@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Mendez Guerra"
+  given-names: "Irene"
+  orcid: "https://orcid.org/0000-0001-7361-4618"
+title: "modular_ml"
+abstract: >-
+  A template for config-driven PyTorch models: the network and loss are
+  assembled from Hydra configs backed by Python dataclasses, and every run,
+  sweep and multi-stage experiment is logged to Weights & Biases.
+version: 1.0.0
+license: MIT
+url: "https://imendezguerra.github.io/modular_ml/"
+repository-code: "https://github.com/imendezguerra/modular_ml"
+keywords:
+  - machine learning
+  - Hydra
+  - dataclasses
+  - Weights & Biases
+  - PyTorch
+  - template

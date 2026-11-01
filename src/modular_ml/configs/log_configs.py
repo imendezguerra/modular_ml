@@ -32,14 +32,7 @@ class ObjectiveConfig:
 
 @dataclass
 class LoggerConfig:
-    """What to log to wandb.
-
-    ``wandb_groups`` selects metric prefixes to forward (e.g. ``train``,
-    ``test``, ``pca``); an empty list forwards everything. ``activation_keys``
-    are data-dict keys to plot as diagnostic time series.
-    """
+    """How runs are scored: the sweep objective, built from logged metrics."""
 
     _target_: str = "modular_ml.configs.log_configs.LoggerConfig"
-    wandb_groups: List[str] = field(default_factory=list)
-    activation_keys: List[str] = field(default_factory=list)
     objective: Optional[ObjectiveConfig] = None

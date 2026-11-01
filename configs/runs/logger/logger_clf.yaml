@@ -1,12 +1,11 @@
-# Logger for the classification task. The sweep objective maximises test accuracy.
+# Logger for the classification task. The sweep objective maximises validation accuracy
+# (held out from the train split); the test split is only for the final report.
 _target_: modular_ml.configs.log_configs.LoggerConfig
-wandb_groups: [train, test, pca]
-activation_keys: [encoder.repr]
 objective:
   _target_: modular_ml.configs.log_configs.ObjectiveConfig
   combination: weighted_mean
   metrics:
     - _target_: modular_ml.configs.log_configs.MetricSpec
-      name: test/accuracy
+      name: val/accuracy
       weight: 1.0
       epoch_reduction: last

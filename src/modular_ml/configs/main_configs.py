@@ -3,14 +3,16 @@
 ``load_config`` is the single entry point that turns a YAML run file into a
 fully-typed :class:`Config` object: it composes config groups (via the
 ``defaults:`` list), resolves interpolations/resolvers, then instantiates every
-``_target_`` into its dataclass. Pass ``instantiate=False`` to keep a raw
-``DictConfig`` (used when merging sweep overrides before instantiation).
+``_target_`` into its dataclass. Pass ``instantiate=False`` to keep the
+resolved ``DictConfig``: the pipeline saves it as the run's ``sim_config.yaml``
+and passes it to :func:`instantiate_config`. Sweeps apply their parameters with
+:func:`merge_overrides` first.
 """
 
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Union
+from typing import Any, Dict, List, Optional, Union
 
 import hydra
 from omegaconf import DictConfig, OmegaConf
@@ -40,33 +42,46 @@ def load_config(
     path: Union[str, Path],
     instantiate: bool = True,
     resolve: bool = True,
+    overrides: Optional[List[str]] = None,
 ) -> Union[Config, DictConfig]:
-    """Compose, resolve and instantiate a run config from a YAML file path."""
+    """Compose, resolve and instantiate a run config from a YAML file path.
+
+    Args:
+        path: Run config YAML.
+        instantiate: Return a typed ``Config`` instead of a ``DictConfig``.
+        resolve: Resolve interpolations.
+        overrides: Hydra overrides, e.g. ``["model=model_gru", "seed=1"]``.
+    """
     path = Path(path).resolve()
 
     # Absolute config dir: a path relative to this file breaks on Windows when the
     # config lives on another drive (os.path.relpath cannot cross drives).
     with hydra.initialize_config_dir(config_dir=str(path.parent), version_base=None):
-        cfg = hydra.compose(config_name=path.stem)
+        cfg = hydra.compose(config_name=path.stem, overrides=overrides or [])
 
     if resolve:
         OmegaConf.resolve(cfg)
-    if instantiate:
-        return hydra.utils.instantiate(cfg, _convert_="all")
-    return cfg
+    return instantiate_config(cfg) if instantiate else cfg
 
 
-def merge_overrides(base_cfg: DictConfig, overrides: Union[List[str], Dict]) -> Config:
-    """Merge dotlist/dict overrides into a composed config, then instantiate.
+def instantiate_config(cfg: DictConfig) -> Any:
+    """Instantiate every ``_target_`` of a composed config into its dataclass."""
+    return hydra.utils.instantiate(cfg, _convert_="all")
 
-    Used by sweeps: the wandb agent supplies overrides as a flat mapping of
-    dotted keys, which are merged before resolution + instantiation.
+
+def merge_overrides(base_cfg: DictConfig, overrides: Dict[str, Any]) -> DictConfig:
+    """Apply flat dotted-key overrides to an unresolved config, then resolve it.
+
+    Used by sweeps: the wandb agent supplies parameters as ``{"optim.lr": 1e-3}``.
+    They are applied before resolution so interpolations pick them up. Unknown
+    keys raise, so a typo in a sweep file fails loudly.
+
+    Args:
+        base_cfg: Composed, unresolved config (``load_config(..., resolve=False)``).
+        overrides: ``{dotted.key: value}`` mapping.
     """
     cfg = deepcopy(base_cfg)
-    if isinstance(overrides, list):
-        override_cfg = OmegaConf.from_dotlist(overrides)
-    else:
-        override_cfg = OmegaConf.create(overrides)
-    merged = OmegaConf.merge(cfg, override_cfg)
-    OmegaConf.resolve(merged)
-    return hydra.utils.instantiate(merged, _convert_="all")
+    for key, value in overrides.items():
+        OmegaConf.update(cfg, key, value, merge=True)
+    OmegaConf.resolve(cfg)
+    return cfg

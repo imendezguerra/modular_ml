@@ -1,0 +1,11 @@
+# Post-test analysis on the model's hidden activity: PCA, plus linear probes that
+# decode the frequency / amplitude cues (`stim`) from it.
+_target_: modular_ml.configs.processing_configs.ProcessingConfig
+run_pca: true
+pca_keys: ["${model.hidden_key}"]
+pca_dims: 10
+evr_threshold: 0.95
+run_probe: true
+probe_keys: ["${model.hidden_key}"]
+probe_targets: ["${dataset.in_key}"]
+probe_folds: 5

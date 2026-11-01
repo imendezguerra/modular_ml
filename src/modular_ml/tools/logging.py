@@ -17,13 +17,15 @@ PathLike = Union[str, Path]
 
 
 def init_wandb_run(config: Dict[str, Any], project: str = PROJECT, **kwargs) -> None:
-    """Initialise a wandb run if one is not already active.
+    """Initialise a wandb run, or add the full config to the active one.
 
-    During sweeps and experiments wandb is initialised by the agent, so this is a
-    no-op when ``wandb.run`` already exists.
+    A sweep agent starts the run itself with only the swept parameters, so the
+    full resolved config is added to it here.
     """
     if wandb.run is None:
         wandb.init(project=project, config=config, **kwargs)
+    else:
+        wandb.config.update(config, allow_val_change=True)
 
 
 def log_metrics(metrics: Dict[str, Any], step: Optional[int] = None) -> None:
@@ -44,33 +46,31 @@ def log_artifact(
     artifact_suffix: str,
     metadata: Optional[dict] = None,
 ) -> None:
-    """Upload a file as a named wandb artifact tied to the current run."""
+    """Upload a file as a wandb artifact named ``<run id>-<suffix>``."""
     if wandb.run is None:
         logger.error("Artifact not logged: no active wandb run.")
         return
     artifact = wandb.Artifact(
-        name=f"{wandb.run.name}-{artifact_suffix}",
-        type=artifact_type,
-        metadata={"config": metadata},
+        name=f"{wandb.run.id}-{artifact_suffix}", type=artifact_type, metadata=metadata
     )
     artifact.add_file(str(path_to_file))
     wandb.run.log_artifact(artifact)
     logger.debug(f"Artifact {artifact.name} logged.")
 
 
-def _artifact_ref(run_name: str, suffix: str, version: str = "latest") -> str:
+def _artifact_ref(run_id: str, suffix: str, version: str = "latest") -> str:
     project_path = f"{PROJECT}" if WANDB_USER is None else f"{WANDB_USER}/{PROJECT}"
-    return f"{project_path}/{run_name}-{suffix}:{version}"
+    return f"{project_path}/{run_id}-{suffix}:{version}"
 
 
 def download_artifact(
-    run_name: str,
+    run_id: str,
     artifact_suffix: str,
     artifact_type: str,
     version: str = "latest",
 ) -> Path:
-    """Download an artifact (by run name + suffix) and return its local dir."""
-    ref = _artifact_ref(run_name, artifact_suffix, version)
+    """Download an artifact (by run id + suffix) and return its local dir."""
+    ref = _artifact_ref(run_id, artifact_suffix, version)
     if wandb.run is None:
         artifact = wandb.Api().artifact(ref, type=artifact_type)
     else:

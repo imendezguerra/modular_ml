@@ -11,8 +11,6 @@ init specs, and ``freeze`` lists parameters to freeze. The network factory
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from modular_ml.configs import enums
-
 
 @dataclass
 class BlockSpec:
@@ -74,7 +72,9 @@ class ModelConfig:
     n_outputs: int = 3
     in_key: str = "stim"
     out_key: str = "prediction"
-    dtype: enums.DType = enums.DType.float32
+    # Data-dict key of the main hidden activity (e.g. ``rnn.activity``), so
+    # optim / processing / logger configs work with any model.
+    hidden_key: str = ""
 
     # Leaky-integrator time constant for recurrent blocks. alpha = dt/tau.
     tau_s: float = 0.05

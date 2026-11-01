@@ -4,10 +4,13 @@ Every block is a ``Block``: it declares ``in_keys`` it reads from a shared
 ``DataDict`` and ``out_keys`` it writes back (namespaced as ``id.out_key``).
 ``forward`` handles the dict plumbing; subclasses implement ``forward_block``.
 This uniform contract is what lets ``ModularNet`` chain arbitrary blocks
-purely from config.
+purely from config. Each block applies its config ``init`` and ``freeze`` specs
+once, at the end of its constructor, via :meth:`Block.set_parameters` and
+:meth:`Block.freeze`.
 
-Only general-purpose blocks live here (RNN, linear, multi-input linear,
-broadcast, fixed encoder, discrete connectivity). No domain-specific layers.
+Only general-purpose blocks live here (leaky RNN, GRU/LSTM, linear, MLP
+encoder, temporal conv, transformer, multi-input linear, broadcast, discrete
+connectivity). No domain-specific layers. Sequence blocks use ``[T, B, F]``.
 """
 
 from math import sqrt
@@ -22,6 +25,10 @@ from modular_ml.models.initializers import _init_param
 from modular_ml.tools.utils import resolve_attr
 
 DataDict = Dict[str, torch.Tensor]
+Activation = Literal["tanh", "relu", "gelu", "none"]
+
+_ACTIVATIONS = {"tanh": nn.Tanh, "relu": nn.ReLU, "gelu": nn.GELU, "none": nn.Identity}
+_RNN_CELLS = {"gru": nn.GRU, "lstm": nn.LSTM, "rnn": nn.RNN}
 
 
 class Block(nn.Module):
@@ -139,7 +146,7 @@ class RNNBlock(Block):
         alpha: float,
         bias_in: bool = False,
         bias_rec: bool = False,
-        activation: Literal["tanh", "relu"] = "tanh",
+        activation: Activation = "tanh",
         noise: Optional[float] = None,
         hidden_init_val: float = 0.1,
         init_specs: Optional[Dict[str, InitSpecs]] = None,
@@ -148,7 +155,7 @@ class RNNBlock(Block):
         super().__init__(id, in_keys, out_keys, in_dim, out_dim)
         self.alpha = alpha
         self.noise_amp = noise or 0.0
-        self.activation = {"tanh": nn.Tanh(), "relu": nn.ReLU()}.get(activation, nn.Tanh())
+        self.activation = _ACTIVATIONS[activation]()
         self.linear_ih = nn.Linear(in_dim, out_dim, bias=bias_in)
         self.linear_hh = nn.Linear(out_dim, out_dim, bias=bias_rec)
         self._init_default()
@@ -182,6 +189,51 @@ class RNNBlock(Block):
         return [h_states]
 
 
+class RecurrentBlock(Block):
+    """PyTorch GRU / LSTM / Elman RNN; outputs ``[sequence, final hidden]``.
+
+    ``out_dim`` is the output feature size (split across directions when
+    ``bidirectional``). ``dropout`` applies between stacked layers.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        in_keys: List[str],
+        out_keys: List[str],
+        in_dim: int,
+        out_dim: int,
+        cell: Literal["gru", "lstm", "rnn"] = "gru",
+        num_layers: int = 1,
+        bias: bool = True,
+        bidirectional: bool = False,
+        dropout: float = 0.0,
+        init_specs: Optional[Dict[str, InitSpecs]] = None,
+        freeze_specs: Optional[List[str]] = None,
+    ) -> None:
+        super().__init__(id, in_keys, out_keys, in_dim, out_dim)
+        self.n_dir = 2 if bidirectional else 1
+        if out_dim % self.n_dir != 0:
+            raise ValueError(f"RecurrentBlock '{id}': out_dim must be even when bidirectional")
+        self.rnn = _RNN_CELLS[cell](
+            in_dim,
+            out_dim // self.n_dir,
+            num_layers=num_layers,
+            bias=bias,
+            dropout=dropout if num_layers > 1 else 0.0,
+            bidirectional=bidirectional,
+        )
+        self.set_parameters(init_specs)
+        self.freeze(freeze_specs)
+
+    def forward_block(self, inputs: torch.Tensor) -> List[torch.Tensor]:
+        """Input ``[T, B, in_dim]`` -> ``[T, B, out_dim]`` and last-layer state ``[B, out_dim]``."""
+        out, h_n = self.rnn(inputs)
+        if isinstance(h_n, tuple):  # LSTM returns (h, c)
+            h_n = h_n[0]
+        return [out, torch.cat(list(h_n[-self.n_dir :]), dim=-1)]
+
+
 class LinearBlock(Block):
     """Single linear layer with optional activation."""
 
@@ -193,22 +245,20 @@ class LinearBlock(Block):
         in_dim: int,
         out_dim: int,
         bias: bool = True,
-        activation: Literal["tanh", "relu", "none"] = "none",
+        activation: Activation = "none",
+        dropout: float = 0.0,
         init_specs: Optional[Dict[str, InitSpecs]] = None,
         freeze_specs: Optional[List[str]] = None,
     ) -> None:
         super().__init__(id, in_keys, out_keys, in_dim, out_dim)
+        self.dropout = nn.Dropout(dropout)  # on the input
         self.linear = nn.Linear(in_dim, out_dim, bias=bias)
-        self.activation = {
-            "tanh": nn.Tanh(),
-            "relu": nn.ReLU(),
-            "none": nn.Identity(),
-        }[activation]
+        self.activation = _ACTIVATIONS[activation]()
         self.set_parameters(init_specs)
         self.freeze(freeze_specs)
 
     def forward_block(self, inputs: torch.Tensor) -> List[torch.Tensor]:
-        return [self.activation(self.linear(inputs))]
+        return [self.activation(self.linear(self.dropout(inputs)))]
 
 
 class FixedEncoderBlock(Block):
@@ -222,10 +272,11 @@ class FixedEncoderBlock(Block):
         in_dim: int,
         out_dim: int,
         hidden_dims: Optional[List[int]] = None,
-        activation: Literal["tanh", "relu", "none"] = "relu",
+        activation: Activation = "relu",
         bias: bool = True,
         normalize: bool = False,
         trainable: bool = True,
+        dropout: float = 0.0,
         init_specs: Optional[Dict[str, InitSpecs]] = None,
         freeze_specs: Optional[List[str]] = None,
     ) -> None:
@@ -233,17 +284,16 @@ class FixedEncoderBlock(Block):
         self.normalize = normalize
         hidden_dims = hidden_dims or []
         dims = [in_dim, *hidden_dims, out_dim]
-        act_cls = {"tanh": nn.Tanh, "relu": nn.ReLU, "none": nn.Identity}[activation]
         layers: List[nn.Module] = []
         for i in range(len(dims) - 1):
             layers.append(nn.Linear(dims[i], dims[i + 1], bias=bias))
             if i < len(dims) - 2:
-                layers.append(act_cls())
+                # One parameter-free slot keeps Linear names at encoder.0, encoder.2, ...
+                layers.append(nn.Sequential(_ACTIVATIONS[activation](), nn.Dropout(dropout)))
         self.encoder = nn.Sequential(*layers)
         self.set_parameters(init_specs)
-        if trainable:
-            self.freeze(freeze_specs)
-        else:
+        self.freeze(freeze_specs)
+        if not trainable:
             for p in self.encoder.parameters():
                 p.requires_grad = False
 
@@ -252,6 +302,114 @@ class FixedEncoderBlock(Block):
         if self.normalize:
             out = F.normalize(out, dim=-1)
         return [out]
+
+
+class Conv1dBlock(Block):
+    """Stack of 1D convolutions over time; ``[T, B, F]`` in and out, T preserved.
+
+    ``causal`` pads on the left only, so step t never sees later steps.
+    ``dropout`` applies after each hidden activation.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        in_keys: List[str],
+        out_keys: List[str],
+        in_dim: int,
+        out_dim: int,
+        kernel_size: int = 3,
+        hidden_dims: Optional[List[int]] = None,
+        activation: Activation = "relu",
+        bias: bool = True,
+        causal: bool = False,
+        dropout: float = 0.0,
+        init_specs: Optional[Dict[str, InitSpecs]] = None,
+        freeze_specs: Optional[List[str]] = None,
+    ) -> None:
+        super().__init__(id, in_keys, out_keys, in_dim, out_dim)
+        dims = [in_dim, *(hidden_dims or []), out_dim]
+        self.convs = nn.ModuleList(
+            nn.Conv1d(dims[i], dims[i + 1], kernel_size, bias=bias) for i in range(len(dims) - 1)
+        )
+        left = kernel_size - 1 if causal else (kernel_size - 1) // 2
+        self.pad = (left, kernel_size - 1 - left)
+        self.activation = _ACTIVATIONS[activation]()
+        self.dropout = nn.Dropout(dropout)
+        self.set_parameters(init_specs)
+        self.freeze(freeze_specs)
+
+    def forward_block(self, inputs: torch.Tensor) -> List[torch.Tensor]:
+        x = inputs.permute(1, 2, 0)  # [T, B, F] -> [B, F, T]
+        for i, conv in enumerate(self.convs):
+            x = conv(F.pad(x, self.pad))
+            if i < len(self.convs) - 1:
+                x = self.dropout(self.activation(x))
+        return [x.permute(2, 0, 1)]
+
+
+class TransformerBlock(Block):
+    """Input projection + sinusoidal positions + ``nn.TransformerEncoder``.
+
+    Works on ``[T, B, F]``; ``out_dim`` is the model width (divisible by
+    ``nhead``). ``causal`` masks attention to later steps.
+    """
+
+    def __init__(
+        self,
+        id: str,
+        in_keys: List[str],
+        out_keys: List[str],
+        in_dim: int,
+        out_dim: int,
+        nhead: int = 4,
+        num_layers: int = 2,
+        dim_feedforward: Optional[int] = None,
+        activation: Literal["relu", "gelu"] = "gelu",
+        norm_first: bool = True,
+        causal: bool = False,
+        dropout: float = 0.0,
+        init_specs: Optional[Dict[str, InitSpecs]] = None,
+        freeze_specs: Optional[List[str]] = None,
+    ) -> None:
+        super().__init__(id, in_keys, out_keys, in_dim, out_dim)
+        self.causal = causal
+        self.proj = nn.Linear(in_dim, out_dim)
+        layer = nn.TransformerEncoderLayer(
+            out_dim,
+            nhead,
+            dim_feedforward or 4 * out_dim,
+            dropout,
+            activation,
+            norm_first=norm_first,
+        )
+        self.encoder = nn.TransformerEncoder(
+            layer,
+            num_layers,
+            norm=nn.LayerNorm(out_dim) if norm_first else None,
+            enable_nested_tensor=False,
+        )
+        self.set_parameters(init_specs)
+        self.freeze(freeze_specs)
+
+    def forward_block(self, inputs: torch.Tensor) -> List[torch.Tensor]:
+        x = self.proj(inputs)
+        T, _, d = x.shape
+        x = x + _sinusoidal_positions(T, d, x.device, x.dtype)
+        mask = None
+        if self.causal:
+            mask = torch.full((T, T), float("-inf"), device=x.device, dtype=x.dtype).triu(1)
+        return [self.encoder(x, mask=mask)]
+
+
+def _sinusoidal_positions(T: int, d: int, device, dtype) -> torch.Tensor:
+    """Fixed sine/cosine position encoding, shape ``[T, 1, d]``."""
+    pos = torch.arange(T, device=device, dtype=dtype).unsqueeze(1)
+    freq = 10000 ** (-torch.arange(0, d, 2, device=device, dtype=dtype) / d)
+    pe = torch.zeros(T, d, device=device, dtype=dtype)
+    pe[:, 0::2] = torch.sin(pos * freq)
+    pe[:, 1::2] = torch.cos(pos * freq)[:, : d // 2]
+    return pe.unsqueeze(1)
 
 
 class BroadcastBlock(Block):
@@ -264,6 +422,8 @@ class BroadcastBlock(Block):
         out_keys: List[str],
         in_dim: int,
         out_dim: int,
+        init_specs: Optional[Dict[str, InitSpecs]] = None,
+        freeze_specs: Optional[List[str]] = None,
     ) -> None:
         if out_dim % in_dim != 0:
             raise ValueError(
@@ -272,6 +432,8 @@ class BroadcastBlock(Block):
             )
         super().__init__(id, in_keys, out_keys, in_dim, out_dim)
         self.repeat_factor = out_dim // in_dim
+        self.set_parameters(init_specs)
+        self.freeze(freeze_specs)
 
     def forward_block(self, inputs: torch.Tensor) -> List[torch.Tensor]:
         return [inputs.repeat_interleave(self.repeat_factor, dim=-1)]
@@ -321,7 +483,7 @@ class MultiInputLinearBlock(Block):
         input_modes: Optional[List[str]] = None,
         bias: bool = False,
         linear_type: Literal["base", "connectivity"] = "base",
-        activation: Literal["tanh", "relu", "none"] = "none",
+        activation: Activation = "none",
         init_specs: Optional[Dict[str, InitSpecs]] = None,
         freeze_specs: Optional[List[str]] = None,
     ) -> None:
@@ -332,11 +494,7 @@ class MultiInputLinearBlock(Block):
             self.linear = ConnectivityLinear(in_dim, out_dim, bias)
         else:
             self.linear = nn.Linear(in_dim, out_dim, bias=bias)
-        self.activation = {
-            "tanh": nn.Tanh(),
-            "relu": nn.ReLU(),
-            "none": nn.Identity(),
-        }[activation]
+        self.activation = _ACTIVATIONS[activation]()
         self.input_modes = self._resolve_modes(input_modes)
         self._build_mask(self.input_modes)
         self.set_parameters(init_specs)

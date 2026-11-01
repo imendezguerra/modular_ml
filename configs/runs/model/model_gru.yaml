@@ -1,0 +1,39 @@
+# Gated recurrent model for the sequential task: GRU -> linear readout.
+# Same task, size and readout as model_rnn; swap with `model: model_gru` in the
+# run config. `cell: lstm` gives an LSTM with the same interface.
+_target_: modular_ml.configs.model_configs.ModelConfig
+name: gru_sine
+n_inputs: ${dataset.in_dim}
+n_outputs: ${dataset.out_dim}
+in_key: ${dataset.in_key}
+out_key: prediction
+hidden_key: gru.activity
+batch_size: 32
+epochs: 200
+
+architecture:
+  _target_: modular_ml.configs.model_configs.ArchitectureConfig
+  global_params:
+    hidden: 64
+  modules:
+    gru:
+      _target_: modular_ml.configs.model_configs.BlockSpec
+      _block_target_: modular_ml.models.blocks.RecurrentBlock
+      id: gru
+      in_keys: ["${model.in_key}"]
+      out_keys: [activity, final]
+      in_dim: ${model.n_inputs}
+      out_dim: ${model.architecture.global_params.hidden}
+      params:
+        cell: gru
+        num_layers: 1
+    readout:
+      _target_: modular_ml.configs.model_configs.BlockSpec
+      _block_target_: modular_ml.models.blocks.LinearBlock
+      id: readout
+      in_keys: [gru.activity]
+      out_keys: [prediction]
+      in_dim: ${model.architecture.global_params.hidden}
+      out_dim: ${model.n_outputs}
+      params:
+        activation: none

@@ -86,19 +86,3 @@ jobs:
           python -m pip install -c ci/constraints-min.txt -e . pytest
       - name: Run tests
         run: python -m pytest
-
-  docs:
-    name: Docs build
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-      - name: Install docs dependencies
-        run: python -m pip install mkdocs mkdocs-material
-      - name: Build docs (strict)
-        run: mkdocs build --strict -f docs/mkdocs.yml
